@@ -35,6 +35,7 @@ class AutoEncoder(object):
         #self.dropout = tf.placeholder_with_default([1.0], None)
         n_outputs = n_inputs
 
+        # Add some corruption
         # Add some corrpution
         # We corrupt inputs prior to feeding model
         corrupt_inputs = self.x
@@ -146,13 +147,12 @@ def main():
     class_to_index = dict(zip(mlb.classes_, range(len(mlb.classes_))))
 
     model = AutoEncoder(len(events), 50, learning_rate=0.001)
-    train_x, test_x, train_y, test_y = event_data.split_dataset()
+    train_x, _, _, _ = event_data.split_dataset()
 
     def get_batch(df, user_ids, mlb):
         """
         This method creates a single vector for each user where all of their
         events are set to a 1, otherwise its a 0.
-        eg
 
         In this case, this user has observed events: 1 and 4
         [1, 0, 0, 1, 0]
@@ -170,7 +170,7 @@ def main():
 
     init = tf.global_variables_initializer()
 
-    n_epochs = 400
+    n_epochs = 10
     batch_size = 64
     batches_per_iteration = int(len(users) / batch_size)
 
@@ -221,6 +221,7 @@ def main():
 
             print("Epoch {:,}/{:<10,} Loss: {:,.6f}".format(epoch, n_epochs,
                                                             epoch_loss))
-
+         
+            
 if __name__ == '__main__':
     main()
