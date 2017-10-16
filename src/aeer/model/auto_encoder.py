@@ -15,6 +15,9 @@ from tensorflow.contrib.layers import fully_connected
 import numpy as np
 from sklearn.preprocessing import MultiLabelBinarizer
 from sklearn.utils import shuffle
+from scipy.stats import bernoulli
+from scipy import sparse
+
 
 
 class AutoEncoder(object):
@@ -25,15 +28,16 @@ class AutoEncoder(object):
         # We need to gather the indices from the matrix where our outputs are
         self.gather_indices = tf.placeholder(tf.int32, shape=[None, 2])
 
+        self.y = tf.placeholder(tf.float32, shape=[None])
+
         # Dropout inputs == Masking Noise on inputs
         # By default if we do not feed this in, no dropout will occur
-        self.dropout = tf.placeholder_with_default([1.0], None)
+        #self.dropout = tf.placeholder_with_default([1.0], None)
         n_outputs = n_inputs
 
         # Add some corrpution
-        # TODO: dropout may only be applicable for the sparse input values not
-        # all
-        corrupt_inputs = tf.nn.dropout(self.x, self.dropout)
+        # We corrupt inputs prior to feeding model
+        corrupt_inputs = self.x
 
         # create hidden layer with default ReLU activation
         hidden = fully_connected(corrupt_inputs, n_hidden)
@@ -44,13 +48,91 @@ class AutoEncoder(object):
             self.gather_indices)
 
         # square loss
-        # Following CDAE: we set all y=1's
         self.loss = tf.losses.mean_squared_error(self.outputs,
-                                                 tf.ones_like(self.outputs))
+                                                 self.y)
         optimizer = tf.train.AdamOptimizer(learning_rate)
 
         # Train Model
         self.train = optimizer.minimize(self.loss)
+
+
+def corrupt_input(x, q):
+    """
+    Corrupt x with probability p by setting it to 0
+    else scale it by 1 / (1-p)
+    """
+    assert x.ndim == 1
+    scale = 1.0 / (1.0-q)
+    # Probability to remove it
+    # p = 1; 1-p = 0
+    p = 1-q
+    mask = bernoulli.rvs(p, size=x.shape[0])
+    # Mask outputs
+    x = x * mask
+    # Re-scale values
+    return x * scale
+
+def sample_negative(pos_item_map, max_items):
+    """Sample uniformly items that are not observed
+
+    :param pos_item_map: set/list, listing all of the users observed items
+    :param max_items: int, item count
+    :returns: int negative item id
+    """
+    while True:
+        sample = np.random.randint(max_items)
+        if sample in pos_item_map:
+            continue
+        return sample
+
+def get_user_input(user_id, df, class_to_index, negative_count, corrupt_ratio):
+    """
+    This will get a single users input. We encode each user with a k-hot
+    encoding, where a 1 if they have rated the item. We then sample
+    negative items they have not observed. Negative items have a target
+    of 0 and positives 1. We finally corrupt all the encoded user
+    vectors.
+
+    :param user_id: user id in dataframe
+    :param df: the dataframe for training
+    :param class_to_index: dictionary that maps item ids to indices
+    :param negative_count: int, number of negative samples
+    :param corrupt_ratio: float, [0, 1] the probability of corrupting samples
+    :returns: Encoded User Vector, Y Target, item ids
+    """
+
+    item_count = len(class_to_index)
+
+    # Get all positive items
+    positives = [class_to_index[i] for i in df.eventId[df.memberId == user_id].unique()]
+
+    # Sample negative items
+    negatives = [sample_negative(positives, item_count) for _ in range(negative_count)]
+
+    input_count = len(positives) + len(negatives)
+
+    # X vector for a single user
+    # Duplicate input count times
+    x_data = [1.0] * input_count
+
+    # Indices for the items
+    cols = positives + negatives
+    rows = []
+    for i in range(input_count):
+        rows.extend([i] * input_count)
+
+    x = sparse.coo_matrix((x_data * input_count,
+                           (rows, cols * input_count)),
+                          shape=(input_count, item_count),
+                          dtype=np.float32)
+
+    # Negative targets are 0, positives are 1
+    y_targets = np.zeros(input_count, dtype=np.float32)
+    y_targets[:len(positives)] = 1.0
+
+    # Sparse Matrix; directly take the data and corrupt it
+    x.data = corrupt_input(x.data, corrupt_ratio).astype(np.float32)
+    return x, y_targets, cols
 
 def main():
     event_data = ds.EventData(ds.chicago_file_name)
@@ -92,6 +174,8 @@ def main():
     batch_size = 64
     batches_per_iteration = int(len(users) / batch_size)
 
+    NEG_COUNT = 4
+    CORRUPT_RATIO = 0.5
 
     with tf.Session() as sess:
         init.run()
@@ -99,25 +183,40 @@ def main():
             # additive gaussian noise or multiplicative mask-out/drop-out noise
             epoch_loss = 0.0
             users = shuffle(users)
-            for idx in range(batches_per_iteration):
-                # Batch indices
-                lo = batch_size * idx
-                hi = lo + batch_size
 
-                x, item_ids = get_batch(train_x, users[lo:hi], mlb)
+            for user_id in users:
+                x, y, item = get_user_input(user_id, train_x, class_to_index, NEG_COUNT, CORRUPT_RATIO)
 
                 # We only compute loss on events we used as inputs
-                gather_indices = []
-                for row_index, ids in enumerate(item_ids):
-                    gather_indices.extend([[row_index, class_to_index[iid]]
-                                           for iid in ids])
+                # Each row is to index the first dimension
+                gather_indices = zip(range(len(y)), item)
 
                 # Get a batch of data
                 batch_loss, _ = sess.run([model.loss, model.train], {
-                    model.x: x,
+                    model.x: x.toarray().astype(np.float32),
                     model.gather_indices: gather_indices,
-                    model.dropout: 0.5 # Dropout = Some masking noise
+                    model.y: y
                 })
+
+            # for idx in range(batches_per_iteration):
+            #     # Batch indices
+            #     lo = batch_size * idx
+            #     hi = lo + batch_size
+
+            #     x, item_ids = get_batch(train_x, users[lo:hi], mlb)
+
+            #     # We only compute loss on events we used as inputs
+            #     gather_indices = []
+            #     for row_index, ids in enumerate(item_ids):
+            #         gather_indices.extend([[row_index, class_to_index[iid]]
+            #                                for iid in ids])
+
+            #     # Get a batch of data
+            #     batch_loss, _ = sess.run([model.loss, model.train], {
+            #         model.x: x,
+            #         model.gather_indices: gather_indices,
+            #         #model.dropout: 0.5 # Dropout = Some masking noise
+            #     })
                 epoch_loss += batch_loss
 
             print("Epoch {:,}/{:<10,} Loss: {:,.6f}".format(epoch, n_epochs,
