@@ -8,7 +8,6 @@ import os
 os.environ['CUDA_VISIBLE_DEVICES'] = '3'
 
 import aeer.dataset.event_dataset as ds
-
 import tensorflow as tf
 from tensorflow.contrib.layers import fully_connected
 
@@ -135,6 +134,26 @@ def get_user_input(user_id, df, class_to_index, negative_count, corrupt_ratio):
     x.data = corrupt_input(x.data, corrupt_ratio).astype(np.float32)
     return x, y_targets, cols
 
+def _get_batch(df, user_ids, mlb):
+    """
+    This method creates a single vector for each user where all of their
+    events are set to a 1, otherwise its a 0.
+
+    In this case, this user has observed events: 1 and 4
+    [1, 0, 0, 1, 0]
+
+    TODO: Should probably abstract this out somewhere
+
+    :param df: pd.DataFrame of test/train
+    :param user_ids: list of user ids, this will query the dataframe
+    :param mlb: sklearn.MultiLabelBinarizer fitted with the event data
+    :returns: np.array of values
+    """
+    item_ids = [df.eventId[df.memberId == uid].unique() for uid in user_ids
+                if len(df.eventId[df.memberId == uid].unique()) > 0]
+    return mlb.transform(item_ids), item_ids
+
+
 def main():
     event_data = ds.EventData(ds.chicago_file_name)
     users = event_data.get_users()
@@ -148,25 +167,6 @@ def main():
 
     model = AutoEncoder(len(events), 50, learning_rate=0.001)
     train_x, test_x, _, _ = event_data.split_dataset()
-
-    def get_batch(df, user_ids, mlb):
-        """
-        This method creates a single vector for each user where all of their
-        events are set to a 1, otherwise its a 0.
-
-        In this case, this user has observed events: 1 and 4
-        [1, 0, 0, 1, 0]
-
-        TODO: Should probably abstract this out somewhere
-
-        :param df: pd.DataFrame of test/train
-        :param user_ids: list of user ids, this will query the dataframe
-        :param mlb: sklearn.MultiLabelBinarizer fitted with the event data
-        :returns: np.array of values
-        """
-        item_ids = [df.eventId[df.memberId == uid].unique() for uid in user_ids
-                    if len(df.eventId[df.memberId == uid].unique()) > 0]
-        return mlb.transform(item_ids), item_ids
 
     init = tf.global_variables_initializer()
 
@@ -226,7 +226,7 @@ def main():
             for user_id in users:
                 # check if user was present in training data
                 if user_id in train_x.memberId:
-                    x, y, item = get_user_input(user_id, test_x, class_to_index, NEG_COUNT, CORRUPT_RATIO)
+                    x, y, item = event_data.get_user_test_events(user_id, class_to_index)
 
                     # We only compute loss on events we used as inputs
                     # Each row is to index the first dimension

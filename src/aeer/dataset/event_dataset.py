@@ -50,14 +50,14 @@ class EventData(object):
         return self.get_user_events(user_id, self.train_x, class_to_index, negative_count, corrupt_ratio)
 
     
-    def get_user_test_events(self, user_id, class_to_index, negative_count, corrupt_ratio):
+    def get_user_test_events(self, user_id, class_to_index):
         """
         Calls the get_user_events method with the test data
         """
-        return self.get_user_events(user_id, self.test_x, class_to_index, negative_count, corrupt_ratio)
+        return self.get_user_events(user_id, self.test_x, class_to_index)
 
     
-    def get_user_events(self, user_id, df, class_to_index, negative_count, corrupt_ratio):
+    def get_user_events(self, user_id, df, class_to_index, negative_count=0, corrupt_ratio=0):
         """
         This will get a single users events (training or test based on input parameter). 
         We encode each user with a k-hot encoding, where a 1 if they have rated the item. 
@@ -79,8 +79,11 @@ class EventData(object):
         positives = [class_to_index[i] for i in df.eventId[df.memberId == user_id].unique()]
     
         # Sample negative items
-        negatives = [self.sample_negative(positives, event_count) for _ in range(negative_count)]
-    
+        if negative_count > 0:
+            negatives = [self.sample_negative(positives, event_count) for _ in range(negative_count)]
+        else:
+            negatives = []
+            
         input_count = len(positives) + len(negatives)
     
         # X vector for a single user
@@ -103,7 +106,9 @@ class EventData(object):
         y_targets[:len(positives)] = 1.0
     
         # Sparse Matrix; directly take the data and corrupt it
-        x.data = self.corrupt_input(x.data, corrupt_ratio).astype(np.float32)
+        if corrupt_ratio > 0:
+            x.data = self.corrupt_input(x.data, corrupt_ratio).astype(np.float32)
+        
         return x, y_targets, cols
 
 
