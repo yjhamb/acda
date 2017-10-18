@@ -147,7 +147,7 @@ def main():
     class_to_index = dict(zip(mlb.classes_, range(len(mlb.classes_))))
 
     model = AutoEncoder(len(events), 50, learning_rate=0.001)
-    train_x, _, _, _ = event_data.split_dataset()
+    train_x, test_x, _, _ = event_data.split_dataset()
 
     def get_batch(df, user_ids, mlb):
         """
@@ -222,6 +222,23 @@ def main():
             print("Epoch {:,}/{:<10,} Loss: {:,.6f}".format(epoch, n_epochs,
                                                             epoch_loss))
          
+            # evaluate the model on the test set
+            for user_id in users:
+                # check if user was present in training data
+                if user_id in train_x.memberId:
+                    x, y, item = get_user_input(user_id, test_x, class_to_index, NEG_COUNT, CORRUPT_RATIO)
+
+                    # We only compute loss on events we used as inputs
+                    # Each row is to index the first dimension
+                    gather_indices = zip(range(len(y)), item)
+
+                    # Get a batch of data
+                    batch_loss, _ = sess.run([model.loss, model.train], {
+                        model.x: x.toarray().astype(np.float32),
+                        model.gather_indices: gather_indices,
+                        model.y: y
+                        })
+                    
             
 if __name__ == '__main__':
     main()
