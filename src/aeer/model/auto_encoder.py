@@ -189,7 +189,7 @@ def main():
 
                 # We only compute loss on events we used as inputs
                 # Each row is to index the first dimension
-                gather_indices = zip(range(len(y)), item)
+                gather_indices = list(zip(range(len(y)), item))
 
                 # Get a batch of data
                 batch_loss, _ = sess.run([model.loss, model.train], {
@@ -221,7 +221,7 @@ def main():
 
             print("Epoch {:,}/{:<10,} Loss: {:,.6f}".format(epoch, n_epochs,
                                                             epoch_loss))
-         
+
             # evaluate the model on the test set
             for user_id in users:
                 # check if user was present in training data
@@ -230,7 +230,7 @@ def main():
 
                     # We only compute loss on events we used as inputs
                     # Each row is to index the first dimension
-                    gather_indices = zip(range(len(y)), item)
+                    gather_indices = list(zip(range(len(y)), item))
 
                     # Get a batch of data
                     batch_loss, _ = sess.run([model.loss, model.train], {
@@ -238,7 +238,7 @@ def main():
                         model.gather_indices: gather_indices,
                         model.y: y
                         })
-                    
-            
+
+
 if __name__ == '__main__':
     main()
