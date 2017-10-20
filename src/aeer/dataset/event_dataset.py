@@ -18,9 +18,6 @@ class EventData(object):
     
     def __init__(self, file_name):
         self.events = pd.read_csv(file_name)
- 
-        
-    def split_dataset(self):
         # sort the event data by event time
         events_sorted = self.events.sort_values(['eventTime'], ascending=True)
         x = events_sorted.drop(['rsvpRating'], axis=1)
@@ -28,7 +25,6 @@ class EventData(object):
     
         # perform the train-test split
         self.train_x, self.test_x, self.train_y, self.test_y = ms.train_test_split(x, y, test_size=0.2, random_state=42)
-        return self.train_x, self.test_x, self.train_y, self.test_y
 
     
     def get_users(self):
@@ -38,6 +34,18 @@ class EventData(object):
     def get_events(self):
         return self.events.eventId.unique()
 
+
+    def get_train_users(self):
+        return self.train_x.memberId.unique()
+    
+    
+    def get_test_users(self):
+        return self.test_x.memberId.unique()
+
+
+    def get_train_events(self):
+        return self.train_x.eventId.unique()
+    
     
     def get_test_events(self):
         return self.test_x.eventId.unique()

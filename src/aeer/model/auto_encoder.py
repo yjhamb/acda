@@ -14,9 +14,6 @@ from tensorflow.contrib.layers import fully_connected
 import numpy as np
 from sklearn.preprocessing import MultiLabelBinarizer
 from sklearn.utils import shuffle
-from scipy.stats import bernoulli
-from scipy import sparse
-
 
 
 class AutoEncoder(object):
@@ -56,84 +53,6 @@ class AutoEncoder(object):
         self.train = optimizer.minimize(self.loss)
 
 
-def corrupt_input(x, q):
-    """
-    Corrupt x with probability p by setting it to 0
-    else scale it by 1 / (1-p)
-    """
-    assert x.ndim == 1
-    scale = 1.0 / (1.0-q)
-    # Probability to remove it
-    # p = 1; 1-p = 0
-    p = 1-q
-    mask = bernoulli.rvs(p, size=x.shape[0])
-    # Mask outputs
-    x = x * mask
-    # Re-scale values
-    return x * scale
-
-def sample_negative(pos_item_map, max_items):
-    """Sample uniformly items that are not observed
-
-    :param pos_item_map: set/list, listing all of the users observed items
-    :param max_items: int, item count
-    :returns: int negative item id
-    """
-    while True:
-        sample = np.random.randint(max_items)
-        if sample in pos_item_map:
-            continue
-        return sample
-
-def get_user_input(user_id, df, class_to_index, negative_count, corrupt_ratio):
-    """
-    This will get a single users input. We encode each user with a k-hot
-    encoding, where a 1 if they have rated the item. We then sample
-    negative items they have not observed. Negative items have a target
-    of 0 and positives 1. We finally corrupt all the encoded user
-    vectors.
-
-    :param user_id: user id in dataframe
-    :param df: the dataframe for training
-    :param class_to_index: dictionary that maps item ids to indices
-    :param negative_count: int, number of negative samples
-    :param corrupt_ratio: float, [0, 1] the probability of corrupting samples
-    :returns: Encoded User Vector, Y Target, item ids
-    """
-
-    item_count = len(class_to_index)
-
-    # Get all positive items
-    positives = [class_to_index[i] for i in df.eventId[df.memberId == user_id].unique()]
-
-    # Sample negative items
-    negatives = [sample_negative(positives, item_count) for _ in range(negative_count)]
-
-    input_count = len(positives) + len(negatives)
-
-    # X vector for a single user
-    # Duplicate input count times
-    x_data = [1.0] * input_count
-
-    # Indices for the items
-    cols = positives + negatives
-    rows = []
-    for i in range(input_count):
-        rows.extend([i] * input_count)
-
-    x = sparse.coo_matrix((x_data * input_count,
-                           (rows, cols * input_count)),
-                          shape=(input_count, item_count),
-                          dtype=np.float32)
-
-    # Negative targets are 0, positives are 1
-    y_targets = np.zeros(input_count, dtype=np.float32)
-    y_targets[:len(positives)] = 1.0
-
-    # Sparse Matrix; directly take the data and corrupt it
-    x.data = corrupt_input(x.data, corrupt_ratio).astype(np.float32)
-    return x, y_targets, cols
-
 def _get_batch(df, user_ids, mlb):
     """
     This method creates a single vector for each user where all of their
@@ -166,14 +85,10 @@ def main():
     class_to_index = dict(zip(mlb.classes_, range(len(mlb.classes_))))
 
     model = AutoEncoder(len(events), 50, learning_rate=0.001)
-    train_x, test_x, _, _ = event_data.split_dataset()
 
     init = tf.global_variables_initializer()
 
     n_epochs = 10
-    batch_size = 64
-    batches_per_iteration = int(len(users) / batch_size)
-
     NEG_COUNT = 4
     CORRUPT_RATIO = 0.5
 
@@ -185,7 +100,7 @@ def main():
             users = shuffle(users)
 
             for user_id in users:
-                x, y, item = get_user_input(user_id, train_x, class_to_index, NEG_COUNT, CORRUPT_RATIO)
+                x, y, item = event_data.get_user_train_events(user_id, class_to_index, NEG_COUNT, CORRUPT_RATIO)
 
                 # We only compute loss on events we used as inputs
                 # Each row is to index the first dimension
@@ -198,25 +113,6 @@ def main():
                     model.y: y
                 })
 
-            # for idx in range(batches_per_iteration):
-            #     # Batch indices
-            #     lo = batch_size * idx
-            #     hi = lo + batch_size
-
-            #     x, item_ids = get_batch(train_x, users[lo:hi], mlb)
-
-            #     # We only compute loss on events we used as inputs
-            #     gather_indices = []
-            #     for row_index, ids in enumerate(item_ids):
-            #         gather_indices.extend([[row_index, class_to_index[iid]]
-            #                                for iid in ids])
-
-            #     # Get a batch of data
-            #     batch_loss, _ = sess.run([model.loss, model.train], {
-            #         model.x: x,
-            #         model.gather_indices: gather_indices,
-            #         #model.dropout: 0.5 # Dropout = Some masking noise
-            #     })
                 epoch_loss += batch_loss
 
             print("Epoch {:,}/{:<10,} Loss: {:,.6f}".format(epoch, n_epochs,
@@ -225,7 +121,8 @@ def main():
             # evaluate the model on the test set
             for user_id in users:
                 # check if user was present in training data
-                if user_id in train_x.memberId:
+                train_users = event_data.get_train_users()
+                if user_id in train_users:
                     x, y, item = event_data.get_user_test_events(user_id, class_to_index)
 
                     # We only compute loss on events we used as inputs
