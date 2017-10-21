@@ -88,7 +88,7 @@ def main():
 
     init = tf.global_variables_initializer()
 
-    n_epochs = 10
+    n_epochs = 1
     NEG_COUNT = 4
     CORRUPT_RATIO = 0.5
 
@@ -118,23 +118,24 @@ def main():
             print("Epoch {:,}/{:<10,} Loss: {:,.6f}".format(epoch, n_epochs,
                                                             epoch_loss))
 
-            # evaluate the model on the test set
-            for user_id in users:
-                # check if user was present in training data
-                train_users = event_data.get_train_users()
-                if user_id in train_users:
-                    x, y, item = event_data.get_user_test_events(user_id, class_to_index)
+        # evaluate the model on the test set
+        test_users = event_data.get_test_users()
+        for user_id in test_users:
+            # check if user was present in training data
+            train_users = event_data.get_train_users()
+            if user_id in train_users:
+                x, y, item = event_data.get_user_test_events(user_id, class_to_index)
 
-                    # We only compute loss on events we used as inputs
-                    # Each row is to index the first dimension
-                    gather_indices = list(zip(range(len(y)), item))
+                # We only compute loss on events we used as inputs
+                # Each row is to index the first dimension
+                gather_indices = list(zip(range(len(y)), item))
 
-                    # Get a batch of data
-                    batch_loss, _ = sess.run([model.loss, model.train], {
-                        model.x: x.toarray().astype(np.float32),
-                        model.gather_indices: gather_indices,
-                        model.y: y
-                        })
+                # Get a batch of data
+                batch_loss, _ = sess.run([model.loss, model.train], {
+                    model.x: x.toarray().astype(np.float32),
+                    model.gather_indices: gather_indices,
+                    model.y: y
+                    })
 
 
 if __name__ == '__main__':
