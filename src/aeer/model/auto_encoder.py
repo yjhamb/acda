@@ -43,6 +43,10 @@ class AutoEncoder(object):
             fully_connected(hidden, n_outputs, activation_fn=None),
             self.gather_indices)
 
+        # We need to use this within a graph
+        self.targets = tf.placeholder(tf.int32)
+        self.outputs_top = tf.nn.in_top_k(self.outputs, self.targets, k=10)
+
         # square loss
         self.loss = tf.losses.mean_squared_error(self.outputs,
                                                  self.y)
@@ -133,20 +137,22 @@ def main():
                 # Each row is to index the first dimension
                 gather_indices = list(zip(range(len(y)), item))
 
-                # Get a batch of data
-                batch_loss, _ = sess.run([model.outputs], {
-                    model.x: x.toarray().astype(np.float32),
-                    model.gather_indices: gather_indices
-                    })
+                print("Not Implemented Here")
                 # get the predicted events
-                predicted_events = tf.nn.in_top_k(model.outputs, unique_user_test_events, k=10)
+                predicted_events = sess.run(model.outputs_top, {
+                    model.x: x.toarray().astype(np.float32),
+
+                    # need to figure out what to feed
+                    model.targets:
+                })
+
                 precision = precision + np.sum(predicted_events)
-        
+
         avg_precision = 0
         if (valid_test_users > 0):
             avg_precision = precision / valid_test_users
-        
+
         print("Precision: {:,.6f}".format(avg_precision))
-        
+
 if __name__ == '__main__':
     main()
