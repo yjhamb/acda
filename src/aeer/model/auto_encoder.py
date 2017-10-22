@@ -87,7 +87,7 @@ def main():
 
     init = tf.global_variables_initializer()
 
-    n_epochs = 1
+    n_epochs = 10
     NEG_COUNT = 4
     CORRUPT_RATIO = 0.5
 
