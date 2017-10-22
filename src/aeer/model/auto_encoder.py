@@ -87,7 +87,7 @@ def main():
 
     init = tf.global_variables_initializer()
 
-    n_epochs = 10
+    n_epochs = 1
     NEG_COUNT = 4
     CORRUPT_RATIO = 0.5
 
@@ -140,7 +140,7 @@ def main():
                     model.y: y
                     })
                 # get the predicted events
-                predicted_events = tf.nn.in_top_k(model.outputs, unique_user_test_events, k=10, sorted=True)
+                predicted_events = tf.nn.in_top_k(model.outputs, unique_user_test_events, k=10)
                 precision = precision + np.sum(predicted_events)
         
         avg_precision = 0
