@@ -134,10 +134,9 @@ def main():
                 gather_indices = list(zip(range(len(y)), item))
 
                 # Get a batch of data
-                batch_loss, _ = sess.run([model.loss, model.train], {
+                batch_loss, _ = sess.run([model.outputs], {
                     model.x: x.toarray().astype(np.float32),
-                    model.gather_indices: gather_indices,
-                    model.y: y
+                    model.gather_indices: gather_indices
                     })
                 # get the predicted events
                 predicted_events = tf.nn.in_top_k(model.outputs, unique_user_test_events, k=10)
