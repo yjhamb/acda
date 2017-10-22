@@ -32,7 +32,6 @@ class AutoEncoder(object):
         n_outputs = n_inputs
 
         # Add some corruption
-        # Add some corrpution
         # We corrupt inputs prior to feeding model
         corrupt_inputs = self.x
 
@@ -136,6 +135,8 @@ def main():
                     model.gather_indices: gather_indices,
                     model.y: y
                     })
+                # get the predicted events
+                predicted_events = model.outputs
 
 
 if __name__ == '__main__':
