@@ -119,10 +119,14 @@ def main():
 
         # evaluate the model on the test set
         test_users = event_data.get_test_users()
+        precision = 0
+        valid_test_users = 0
         for user_id in test_users:
             # check if user was present in training data
             train_users = event_data.get_train_users()
             if user_id in train_users:
+                valid_test_users = valid_test_users + 1
+                unique_user_test_events = event_data.get_user_unique_test_events(user_id)
                 x, y, item = event_data.get_user_test_events(user_id, class_to_index)
 
                 # We only compute loss on events we used as inputs
@@ -136,8 +140,14 @@ def main():
                     model.y: y
                     })
                 # get the predicted events
-                predicted_events = model.outputs
-
-
+                predicted_events = tf.nn.in_top_k(model.outputs, unique_user_test_events, k=10, sorted=True)
+                precision = precision + np.sum(predicted_events)
+        
+        avg_precision = 0
+        if (valid_test_users > 0):
+            avg_precision = precision / valid_test_users
+        
+        print("Precision: {:,.6f}".format(avg_precision))
+        
 if __name__ == '__main__':
     main()

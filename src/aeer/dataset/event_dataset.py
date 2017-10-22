@@ -49,6 +49,10 @@ class EventData(object):
     
     def get_test_events(self):
         return self.test_x.eventId.unique()
+    
+    
+    def get_user_unique_test_events(self, user_id):
+        return self.test_x.eventId[self.test_x.memberId == user_id].unique()
 
     
     def get_user_train_events(self, user_id, class_to_index, negative_count, corrupt_ratio):
