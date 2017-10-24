@@ -153,7 +153,28 @@ class EventData(object):
         x = x * mask
         # Re-scale values
         return x * scale
+   
+    
+    def _get_batch(self, df, user_ids, mlb):
+        """
+        This method creates a single vector for each user where all of their
+        events are set to a 1, otherwise its a 0.
+    
+        In this case, this user has observed events: 1 and 4
+        [1, 0, 0, 1, 0]
+    
+        TODO: Should probably abstract this out somewhere
+    
+        :param df: pd.DataFrame of test/train
+        :param user_ids: list of user ids, this will query the dataframe
+        :param mlb: sklearn.MultiLabelBinarizer fitted with the event data
+        :returns: np.array of values
+        """
+        item_ids = [df.eventId[df.memberId == uid].unique() for uid in user_ids
+                    if len(df.eventId[df.memberId == uid].unique()) > 0]
+        return mlb.transform(item_ids), item_ids
 
+    
        
 def main():
     print("main method")

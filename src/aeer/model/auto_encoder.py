@@ -2,7 +2,7 @@
 Denoising AutoEncoder Implementation
 
 '''
-from __future__ import print_function, division # Python2/3 Compatability
+from __future__ import print_function, division  # Python2/3 Compatability
 import os
 
 os.environ['CUDA_VISIBLE_DEVICES'] = '3'
@@ -28,52 +28,29 @@ class AutoEncoder(object):
 
         # Dropout inputs == Masking Noise on inputs
         # By default if we do not feed this in, no dropout will occur
-        #self.dropout = tf.placeholder_with_default([1.0], None)
+        # self.dropout = tf.placeholder_with_default([1.0], None)
         n_outputs = n_inputs
 
-        # Add some corruption
-        # We corrupt inputs prior to feeding model
-        corrupt_inputs = self.x
-
         # create hidden layer with default ReLU activation
-        hidden = fully_connected(corrupt_inputs, n_hidden)
+        hidden = fully_connected(self.x, n_hidden)
 
         # create the output layer with no activation function
-        self.outputs = tf.gather_nd(
-            fully_connected(hidden, n_outputs, activation_fn=None),
-            self.gather_indices)
+        self.outputs = fully_connected(hidden, n_outputs, activation_fn=None)
+        
+        self.targets = tf.gather_nd(self.outputs, self.gather_indices)
+        
+        self.actuals = tf.placeholder(tf.float32, shape=[None, n_outputs])
 
-        # We need to use this within a graph
-        self.targets = tf.placeholder(tf.int32)
-        self.outputs_top = tf.nn.in_top_k(self.outputs, self.targets, k=10)
+        # evaluate top k wrt outputs and actuals
+        self.top_k = tf.nn.in_top_k(self.outputs, self.actuals, k=10)
 
         # square loss
-        self.loss = tf.losses.mean_squared_error(self.outputs,
+        self.loss = tf.losses.mean_squared_error(self.targets,
                                                  self.y)
         optimizer = tf.train.AdamOptimizer(learning_rate)
 
         # Train Model
         self.train = optimizer.minimize(self.loss)
-
-
-def _get_batch(df, user_ids, mlb):
-    """
-    This method creates a single vector for each user where all of their
-    events are set to a 1, otherwise its a 0.
-
-    In this case, this user has observed events: 1 and 4
-    [1, 0, 0, 1, 0]
-
-    TODO: Should probably abstract this out somewhere
-
-    :param df: pd.DataFrame of test/train
-    :param user_ids: list of user ids, this will query the dataframe
-    :param mlb: sklearn.MultiLabelBinarizer fitted with the event data
-    :returns: np.array of values
-    """
-    item_ids = [df.eventId[df.memberId == uid].unique() for uid in user_ids
-                if len(df.eventId[df.memberId == uid].unique()) > 0]
-    return mlb.transform(item_ids), item_ids
 
 
 def main():
@@ -131,22 +108,15 @@ def main():
             if user_id in train_users:
                 valid_test_users = valid_test_users + 1
                 unique_user_test_events = event_data.get_user_unique_test_events(user_id)
-                x, y, item = event_data.get_user_test_events(user_id, class_to_index)
+                x, _, _ = event_data.get_user_test_events(user_id, class_to_index)
 
-                # We only compute loss on events we used as inputs
-                # Each row is to index the first dimension
-                gather_indices = list(zip(range(len(y)), item))
-
-                print("Not Implemented Here")
-                # get the predicted events
-                predicted_events = sess.run(model.outputs_top, {
+                # evaluate the model using the actuals
+                top_k_events = sess.run(model.top_k, {
                     model.x: x.toarray().astype(np.float32),
-
-                    # need to figure out what to feed
-                    model.targets:
+                    model.actuals: unique_user_test_events
                 })
 
-                precision = precision + np.sum(predicted_events)
+                precision = precision + np.sum(top_k_events)
 
         avg_precision = 0
         if (valid_test_users > 0):
