@@ -39,7 +39,7 @@ class AutoEncoder(object):
         
         self.targets = tf.gather_nd(self.outputs, self.gather_indices)
         
-        self.actuals = tf.placeholder(tf.float32, shape=[None, n_outputs])
+        self.actuals = tf.placeholder(tf.int32, shape=[n_outputs])
 
         # evaluate top k wrt outputs and actuals
         self.top_k = tf.nn.in_top_k(self.outputs, self.actuals, k=10)
