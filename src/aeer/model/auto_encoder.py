@@ -31,14 +31,24 @@ class AutoEncoder(object):
         # self.dropout = tf.placeholder_with_default([1.0], None)
         n_outputs = n_inputs
 
+        # Weights
+        W = tf.get_variable('W', shape=[n_inputs, n_hidden])
+        b = tf.get_variable('Bias', shape=[n_hidden])
+
+        # We want a size of [Number of Events, Latent Size]
+        #event_weight_bias = tf.get_variable('EventBias', shape=[n_inputs, n_hidden])
+        # We lookup a bias for each event
+        #event_bias = tf.nn.embedding_lookup(event_bias, event_ids)
+
         # create hidden layer with default ReLU activation
-        hidden = fully_connected(self.x, n_hidden)
+        # fully_connected(self.x, n_hidden)
+        hidden = tf.nn.relu(tf.nn.xw_plus_b(self.x, W, b))
 
         # create the output layer with no activation function
         self.outputs = fully_connected(hidden, n_outputs, activation_fn=None)
-        
+
         self.targets = tf.gather_nd(self.outputs, self.gather_indices)
-        
+
         self.actuals = tf.placeholder(tf.int32, shape=[n_outputs])
 
         # evaluate top k wrt outputs and actuals
