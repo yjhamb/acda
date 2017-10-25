@@ -49,14 +49,13 @@ class AutoEncoder(object):
 
         self.targets = tf.gather_nd(self.outputs, self.gather_indices)
 
-        self.actuals = tf.placeholder(tf.int32, shape=[n_outputs])
+        self.actuals = tf.placeholder(tf.int32, shape=[None])
 
         # evaluate top k wrt outputs and actuals
         self.top_k = tf.nn.in_top_k(self.outputs, self.actuals, k=10)
 
         # square loss
-        self.loss = tf.losses.mean_squared_error(self.targets,
-                                                 self.y)
+        self.loss = tf.losses.mean_squared_error(self.targets, self.y)
         optimizer = tf.train.AdamOptimizer(learning_rate)
 
         # Train Model
@@ -78,7 +77,7 @@ def main():
 
     init = tf.global_variables_initializer()
 
-    n_epochs = 1
+    n_epochs = 10
     NEG_COUNT = 4
     CORRUPT_RATIO = 0.5
 
@@ -118,12 +117,13 @@ def main():
             if user_id in train_users:
                 valid_test_users = valid_test_users + 1
                 unique_user_test_events = event_data.get_user_unique_test_events(user_id)
+                test_event_index = [class_to_index[i] for i in unique_user_test_events]
                 x, _, _ = event_data.get_user_test_events(user_id, class_to_index)
 
                 # evaluate the model using the actuals
                 top_k_events = sess.run(model.top_k, {
                     model.x: x.toarray().astype(np.float32),
-                    model.actuals: unique_user_test_events
+                    model.actuals: test_event_index
                 })
 
                 precision = precision + np.sum(top_k_events)
