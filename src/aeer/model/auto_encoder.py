@@ -81,7 +81,11 @@ def main():
     NEG_COUNT = 4
     CORRUPT_RATIO = 0.5
 
-    with tf.Session() as sess:
+    tf_config = tf.ConfigProto(
+        gpu_options=tf.GPUOptions(per_process_gpu_memory_fraction=0.25,
+                                  allow_growth=True))
+
+    with tf.Session(config=tf_config) as sess:
         init.run()
         for epoch in range(n_epochs):
             # additive gaussian noise or multiplicative mask-out/drop-out noise
