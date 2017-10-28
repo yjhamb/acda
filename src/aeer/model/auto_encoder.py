@@ -43,6 +43,10 @@ class AutoEncoder(object):
         # create hidden layer with default ReLU activation
         # fully_connected(self.x, n_hidden)
         hidden = tf.nn.relu(tf.nn.xw_plus_b(self.x, W, b))
+        # add weight regularizer
+        self.reg_scale = 0.01
+        self.weights_regularizer = tf.nn.l2_loss(W, "weight_loss")
+        #self.reg_loss = tf.reduce_sum(tf.abs(W))
 
         # create the output layer with no activation function
         self.outputs = fully_connected(hidden, n_outputs, activation_fn=None)
@@ -55,9 +59,9 @@ class AutoEncoder(object):
         self.top_k = tf.nn.in_top_k(self.outputs, self.actuals, k=10)
 
         # square loss
-        self.loss = tf.losses.mean_squared_error(self.targets, self.y)
+        self.loss = tf.losses.mean_squared_error(self.targets, self.y) + self.reg_scale * self.weights_regularizer
+        #self.loss = tf.losses.mean_squared_error(self.targets, self.y)
         optimizer = tf.train.AdamOptimizer(learning_rate)
-
         # Train Model
         self.train = optimizer.minimize(self.loss)
 
@@ -77,9 +81,9 @@ def main():
 
     init = tf.global_variables_initializer()
 
-    n_epochs = 10
+    n_epochs = 4
     NEG_COUNT = 4
-    CORRUPT_RATIO = 0.5
+    CORRUPT_RATIO = 0.1
 
     tf_config = tf.ConfigProto(
         gpu_options=tf.GPUOptions(per_process_gpu_memory_fraction=0.25,
