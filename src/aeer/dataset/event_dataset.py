@@ -1,5 +1,5 @@
 '''
-Functions that operate on the dataset
+Functions that operate on the event dataset
 '''
 import os
 import pandas as pd
