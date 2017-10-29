@@ -59,8 +59,8 @@ class AutoEncoder(object):
         self.top_k = tf.nn.in_top_k(self.outputs, self.actuals, k=10)
 
         # square loss
-        self.loss = tf.losses.mean_squared_error(self.targets, self.y) + self.reg_scale * self.weights_regularizer
-        #self.loss = tf.losses.mean_squared_error(self.targets, self.y)
+        #self.loss = tf.losses.mean_squared_error(self.targets, self.y) + self.reg_scale * self.weights_regularizer
+        self.loss = tf.losses.mean_squared_error(self.targets, self.y)
         optimizer = tf.train.AdamOptimizer(learning_rate)
         # Train Model
         self.train = optimizer.minimize(self.loss)
