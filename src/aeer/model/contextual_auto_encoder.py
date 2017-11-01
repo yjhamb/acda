@@ -1,6 +1,5 @@
 '''
-Basic Denoising AutoEncoder Implementation
-
+Denoising AutoEncoder Implementation that incorporates contextual group and venue data
 '''
 from __future__ import print_function, division  # Python2/3 Compatability
 import os
@@ -16,9 +15,9 @@ from sklearn.preprocessing import MultiLabelBinarizer
 from sklearn.utils import shuffle
 
 
-class AutoEncoder(object):
+class ContextualAutoEncoder(object):
 
-    def __init__(self, n_inputs, n_hidden, learning_rate=0.001):
+    def __init__(self, n_inputs, n_hidden, n_outputs, learning_rate=0.001):
         self.x = tf.placeholder(tf.float32, shape=[None, n_inputs])
 
         # We need to gather the indices from the matrix where our outputs are
@@ -29,7 +28,7 @@ class AutoEncoder(object):
         # Dropout inputs == Masking Noise on inputs
         # By default if we do not feed this in, no dropout will occur
         # self.dropout = tf.placeholder_with_default([1.0], None)
-        n_outputs = n_inputs
+        #n_outputs = n_inputs
 
         # Weights
         W = tf.get_variable('W', shape=[n_inputs, n_hidden])
@@ -42,7 +41,8 @@ class AutoEncoder(object):
 
         # create hidden layer with default ReLU activation
         # fully_connected(self.x, n_hidden)
-        hidden = tf.nn.relu(tf.nn.xw_plus_b(self.x, W, b))
+        #hidden = tf.nn.relu(tf.nn.xw_plus_b(self.x, W, b))
+        hidden = tf.nn.relu(tf.add_n(tf.nn.xw_plus_b(self.x, W, b), self.venue_factor, self.group_factor))
         
         # add weight regularizer
         self.reg_scale = 0.01
@@ -76,14 +76,17 @@ def main():
     event_data = ds.EventData(ds.chicago_file_name)
     users = event_data.get_users()
     events = event_data.get_events()
+    venues = event_data.get_train_venues()
+    groups = event_data.get_train_groups()
     
     # Convert the sparse event indices to a dense vector
     mlb = MultiLabelBinarizer()
     mlb.fit([events])
     # We need this to get the indices of events
     class_to_index = dict(zip(mlb.classes_, range(len(mlb.classes_))))
-    n_inputs = len(events)
-    model = AutoEncoder(n_inputs, n_hidden, learning_rate=0.001)
+    n_inputs = len(events) + len(groups) + len(venues)
+    n_outputs = len(events)
+    model = ContextualAutoEncoder(n_inputs, n_hidden, n_outputs, learning_rate=0.001)
 
     init = tf.global_variables_initializer()
 

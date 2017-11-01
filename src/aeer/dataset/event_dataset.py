@@ -51,6 +51,14 @@ class EventData(object):
         return self.test_x.eventId.unique()
     
     
+    def get_train_venues(self):
+        return self.train_x.venueId.unique()
+    
+    
+    def get_train_groups(self):
+        return self.train_x.groupId.unique()
+    
+    
     def get_user_unique_test_events(self, user_id):
         return self.test_x.eventId[self.test_x.memberId == user_id].unique()
 
