@@ -132,6 +132,98 @@ class EventData(object):
         return x, y_targets, cols
 
 
+    def get_user_events_with_context(self, user_id, df, user_group_data, event_class_to_index, group_class_to_index, negative_count=0, corrupt_ratio=0):
+        """
+        This will get a single users events (training or test based on input parameter). 
+        We encode each user with a k-hot encoding, where a 1 if they have rated the item. 
+        We then sample negative items they have not observed, if neg_ratio > 0. 
+        Negative items have a target of 0 and positives 1. 
+        We finally corrupt all the encoded user vectors, if the corrupt_ratio > 0.
+    
+        :param user_id: user id in dataframe
+        :param df: the dataframe for training or test
+        :param event_class_to_index: dictionary that maps event ids to indices
+        :param group_class_to_index: dictionary that maps group ids to indices
+        :param negative_count: int, ratio of negative samples
+        :param corrupt_ratio: float, [0, 1] the probability of corrupting samples
+        :returns: Encoded User Vector, Y Target, item ids
+        """
+    
+        event_count = len(event_class_to_index)
+        group_count = len(group_class_to_index)
+    
+        # Get all positive items
+        positive_samples = df[df.memberId == user_id]
+        positive_events = [event_class_to_index[i] for i in positive_samples.eventId.unique()]
+        positive_groups = [group_class_to_index[i] for i in positive_samples.groupId.unique()]
+    
+        # Sample negative items
+        negative_groups = []
+        negative_samples = []
+        if negative_count > 0:
+            negative_events = [self.sample_negative(positive_events, event_count) for _ in range(negative_count)]
+            # get the groups associated with the negative events
+            negative_samples.extend(df[df.eventId == event_id] for event_id in event_class_to_index.inverse_transform(negative_events))
+            negative_groups.extend(negative_samples.groupId.unique())
+        else:
+            negative_events = []
+            
+        input_count = len(positive_events) + len(negative_events)
+    
+        # X vector for a single user
+        # Duplicate input count times
+        x_data = [1.0] * input_count
+        
+        # Indices for the items
+        cols = positive_events + negative_events
+        rows = []
+        for i in range(input_count):
+            rows.extend([i] * input_count)
+    
+        x = sparse.coo_matrix((x_data * input_count,
+                               (rows, cols * input_count)),
+                              shape=(input_count, event_count),
+                              dtype=np.float32)
+    
+        # Negative targets are 0, positives are 1
+        y_targets = np.zeros(input_count, dtype=np.float32)
+        y_targets[:len(positive_events)] = 1.0
+    
+        # Sparse Matrix; directly take the data and corrupt it
+        if corrupt_ratio > 0:
+            x.data = self.corrupt_input(x.data, corrupt_ratio).astype(np.float32)
+        
+        input_group_count = len(positive_groups) + len(negative_groups)
+        # create input data vector for groups based on membership
+        x_group_data = []
+        for group_id in positive_samples.groupId.unique():
+            if user_group_data.is_user_in_group(user_id, group_id):
+                x_group_data.extend(1.0)
+            else:
+                x_group_data.extend(0.0)
+                
+        # extend for negative samples
+        for group_id in negative_samples.groupId.unique():
+            if user_group_data.is_user_in_group(user_id, group_id):
+                x_group_data.extend(1.0)
+            else:
+                x_group_data.extend(0.0)
+        
+        # Indices for the items
+        group_cols = positive_groups + negative_groups
+        group_rows = []
+        group_rows.extend(x_group_data * input_group_count)
+    
+        x_group = sparse.coo_matrix((x_group_data * input_group_count,
+                               (group_rows, group_cols * input_group_count)),
+                              shape=(input_group_count, group_count),
+                              dtype=np.float32)
+        
+        # hstack both the event and group matrices
+        input_x = np.vstack(x, x_group)
+        return input_x, y_targets, cols
+
+
     def sample_negative(self, pos_item_map, max_items):
         """Sample uniformly items that are not observed
     
