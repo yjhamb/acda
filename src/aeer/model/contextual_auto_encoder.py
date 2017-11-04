@@ -7,6 +7,7 @@ import os
 os.environ['CUDA_VISIBLE_DEVICES'] = '3'
 
 import aeer.dataset.event_dataset as ds
+import aeer.dataset.user_group_dataset as user_group_ds
 import tensorflow as tf
 from tensorflow.contrib.layers import fully_connected
 
@@ -41,8 +42,8 @@ class ContextualAutoEncoder(object):
 
         # create hidden layer with default ReLU activation
         # fully_connected(self.x, n_hidden)
-        #hidden = tf.nn.relu(tf.nn.xw_plus_b(self.x, W, b))
-        hidden = tf.nn.relu(tf.add_n(tf.nn.xw_plus_b(self.x, W, b), self.venue_factor, self.group_factor))
+        hidden = tf.nn.relu(tf.nn.xw_plus_b(self.x, W, b))
+        #hidden = tf.nn.relu(tf.add_n(tf.nn.xw_plus_b(self.x, W, b), self.venue_factor, self.group_factor))
         
         # add weight regularizer
         self.reg_scale = 0.01
@@ -76,15 +77,25 @@ def main():
     event_data = ds.EventData(ds.chicago_file_name)
     users = event_data.get_users()
     events = event_data.get_events()
-    venues = event_data.get_train_venues()
-    groups = event_data.get_train_groups()
+    venues = event_data.get_venues()
+    groups = event_data.get_groups()
+    
+    # load the user group data
+    user_group_data = user_group_ds.UserGroupData(user_group_ds.chicago_file_name)
     
     # Convert the sparse event indices to a dense vector
     mlb = MultiLabelBinarizer()
     mlb.fit([events])
     # We need this to get the indices of events
-    class_to_index = dict(zip(mlb.classes_, range(len(mlb.classes_))))
-    n_inputs = len(events) + len(groups) + len(venues)
+    event_class_to_index = dict(zip(mlb.classes_, range(len(mlb.classes_))))
+    
+    # Convert the sparse group indices to a dense vector
+    mlb_group = MultiLabelBinarizer()
+    mlb_group.fit([groups])
+    # We need this to get the indices of events
+    group_class_to_index = dict(zip(mlb_group.classes_, range(len(mlb_group.classes_))))
+    
+    n_inputs = len(events) + len(groups)
     n_outputs = len(events)
     model = ContextualAutoEncoder(n_inputs, n_hidden, n_outputs, learning_rate=0.001)
 
@@ -102,7 +113,9 @@ def main():
             users = shuffle(users)
 
             for user_id in users:
-                x, y, item = event_data.get_user_train_events(user_id, class_to_index, NEG_COUNT, CORRUPT_RATIO)
+                x, y, item = event_data.get_user_train_events_with_context(user_id, user_group_data, 
+                                                                           event_class_to_index, group_class_to_index, 
+                                                                           NEG_COUNT, CORRUPT_RATIO)
 
                 # We only compute loss on events we used as inputs
                 # Each row is to index the first dimension
@@ -130,8 +143,8 @@ def main():
             if user_id in train_users:
                 valid_test_users = valid_test_users + 1
                 unique_user_test_events = event_data.get_user_unique_test_events(user_id)
-                test_event_index = [class_to_index[i] for i in unique_user_test_events]
-                x, _, _ = event_data.get_user_test_events(user_id, class_to_index)
+                test_event_index = [event_class_to_index[i] for i in unique_user_test_events]
+                x, _, _ = event_data.get_user_test_events(user_id, user_group_data, event_class_to_index, group_class_to_index)
 
                 # evaluate the model using the actuals
                 top_k_events = sess.run(model.top_k, {

@@ -25,7 +25,7 @@ class EventData(object):
     
         # perform the train-test split
         self.train_x, self.test_x, self.train_y, self.test_y = ms.train_test_split(x, y, test_size=0.2, random_state=42)
-
+        
     
     def get_users(self):
         return self.events.memberId.unique()
@@ -33,6 +33,14 @@ class EventData(object):
     
     def get_events(self):
         return self.events.eventId.unique()
+    
+    
+    def get_venues(self):
+        return self.events.venueId.unique()
+    
+    
+    def get_groups(self):
+        return self.events.groupId.unique()
 
 
     def get_train_users(self):
@@ -49,14 +57,6 @@ class EventData(object):
     
     def get_test_events(self):
         return self.test_x.eventId.unique()
-    
-    
-    def get_train_venues(self):
-        return self.train_x.venueId.unique()
-    
-    
-    def get_train_groups(self):
-        return self.train_x.groupId.unique()
     
     
     def get_user_unique_test_events(self, user_id):
@@ -132,6 +132,20 @@ class EventData(object):
         return x, y_targets, cols
 
 
+    def get_user_train_events_with_context(self, user_id, user_group_data, event_class_to_index, group_class_to_index, negative_count, corrupt_ratio):
+        """
+        Calls the get_user_events method with the training data
+        """
+        return self.get_user_events_with_context(user_id, self.train_x, user_group_data, event_class_to_index, group_class_to_index, negative_count, corrupt_ratio)
+
+    
+    def get_user_test_events_with_context(self, user_id, user_group_data, event_class_to_index, group_class_to_index):
+        """
+        Calls the get_user_events method with the test data
+        """
+        return self.get_user_events_with_context(user_id, self.test_x, user_group_data, event_class_to_index, group_class_to_index)
+
+    
     def get_user_events_with_context(self, user_id, df, user_group_data, event_class_to_index, group_class_to_index, negative_count=0, corrupt_ratio=0):
         """
         This will get a single users events (training or test based on input parameter). 
