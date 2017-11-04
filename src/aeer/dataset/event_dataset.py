@@ -18,6 +18,7 @@ class EventData(object):
     
     def __init__(self, file_name):
         self.events = pd.read_csv(file_name)
+        self.events.loc[self.events['rsvpRating'] == -1, 'rsvpRating'] = 1
         # sort the event data by event time
         events_sorted = self.events.sort_values(['eventTime'], ascending=True)
         x = events_sorted.drop(['rsvpRating'], axis=1)
@@ -241,6 +242,21 @@ class EventData(object):
     def sample_negative(self, pos_item_map, max_items):
         """Sample uniformly items that are not observed
     
+        :param pos_item_map: set/list, listing all of the users observed items
+        :param max_items: int, item count
+        :returns: int negative item id
+        """
+        while True:
+            sample = np.random.randint(max_items)
+            if sample in pos_item_map:
+                continue
+            return sample
+
+
+    def sample_negative_on_context(self, user_id, pos_item_map, max_items):
+        """Sample uniformly items that are not observed
+    
+        :param user_id: user id for which the 
         :param pos_item_map: set/list, listing all of the users observed items
         :param max_items: int, item count
         :returns: int negative item id
