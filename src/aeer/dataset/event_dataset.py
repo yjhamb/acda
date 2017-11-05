@@ -173,15 +173,12 @@ class EventData(object):
         positive_groups = [group_class_to_index[i] for i in positive_samples.groupId.unique()]
     
         # Sample negative items
+        negative_events = []
         negative_groups = []
-        negative_samples = []
         if negative_count > 0:
-            negative_events = [self.sample_negative(positive_events, event_count) for _ in range(negative_count)]
-            # get the groups associated with the negative events
-            negative_samples.extend(df[df.eventId == event_id] for event_id in event_class_to_index.inverse_transform(negative_events))
-            negative_groups.extend(negative_samples.groupId.unique())
-        else:
-            negative_events = []
+            negative_samples = self.sample_negative_on_context(df, user_id, negative_count)
+            negative_events = [event_class_to_index[i] for i in negative_samples.eventId.unique()]
+            negative_groups = [group_class_to_index[i] for i in negative_samples.groupId.unique()]
             
         input_count = len(positive_events) + len(negative_events)
     
@@ -210,19 +207,19 @@ class EventData(object):
         
         input_group_count = len(positive_groups) + len(negative_groups)
         # create input data vector for groups based on membership
-        x_group_data = []
-        for group_id in positive_samples.groupId.unique():
-            if user_group_data.is_user_in_group(user_id, group_id):
-                x_group_data.extend(1.0)
-            else:
-                x_group_data.extend(0.0)
+        x_group_data = [1.0] * len(positive_groups) + [0.0] * len(negative_groups)
+        #for group_id in positive_samples.groupId.unique():
+        #    if user_group_data.is_user_in_group(user_id, group_id):
+        #        x_group_data.extend(1.0)
+        #    else:
+        #        x_group_data.extend(0)
                 
         # extend for negative samples
-        for group_id in negative_samples.groupId.unique():
-            if user_group_data.is_user_in_group(user_id, group_id):
-                x_group_data.extend(1.0)
-            else:
-                x_group_data.extend(0.0)
+        #for group_id in negative_samples.groupId.unique():
+        #    if user_group_data.is_user_in_group(user_id, group_id):
+        #        x_group_data.extend(1.0)
+        #    else:
+        #        x_group_data.extend(0)
         
         # Indices for the items
         group_cols = positive_groups + negative_groups
@@ -234,8 +231,8 @@ class EventData(object):
                               shape=(input_group_count, group_count),
                               dtype=np.float32)
         
-        # hstack both the event and group matrices
-        input_x = np.vstack(x, x_group)
+        # vstack both the event and group matrices
+        input_x = np.vstack((x, x_group))
         return input_x, y_targets, cols
 
 
@@ -253,19 +250,16 @@ class EventData(object):
             return sample
 
 
-    def sample_negative_on_context(self, user_id, pos_item_map, max_items):
+    def sample_negative_on_context(self, df, user_id, count):
         """Sample uniformly items that are not observed
     
-        :param user_id: user id for which the 
-        :param pos_item_map: set/list, listing all of the users observed items
-        :param max_items: int, item count
+        :param df: Dataframe to be sampled
+        :param user_id: user id for which the samples are to be provided 
+        :param count: negative item count
         :returns: int negative item id
         """
-        while True:
-            sample = np.random.randint(max_items)
-            if sample in pos_item_map:
-                continue
-            return sample
+        
+        return df[df.memberId != user_id].sample(count)
 
 
     def corrupt_input(self, x, q):
