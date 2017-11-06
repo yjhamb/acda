@@ -134,6 +134,7 @@ def main():
                                                             epoch_loss))
 
         # evaluate the model on the test set
+        print("Evaluating model on test data")
         test_users = event_data.get_test_users()
         precision = 0
         valid_test_users = 0
@@ -144,7 +145,8 @@ def main():
                 valid_test_users = valid_test_users + 1
                 unique_user_test_events = event_data.get_user_unique_test_events(user_id)
                 test_event_index = [event_class_to_index[i] for i in unique_user_test_events]
-                x, _, _ = event_data.get_user_test_events(user_id, user_group_data, event_class_to_index, group_class_to_index)
+                x, _, _ = event_data.get_user_test_events_with_context(user_id, user_group_data, 
+                                                                   event_class_to_index, group_class_to_index)
 
                 # evaluate the model using the actuals
                 top_k_events = sess.run(model.top_k, {

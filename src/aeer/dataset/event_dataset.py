@@ -193,7 +193,7 @@ class EventData(object):
         rows = []
         for i in range(input_count):
             rows.extend([i] * input_count)
-
+        
         x = sparse.coo_matrix((x_data * input_count,
                                (rows, cols * input_count)),
                               shape=(input_count, event_count),
@@ -208,34 +208,37 @@ class EventData(object):
             x.data = self.corrupt_input(x.data, corrupt_ratio).astype(np.float32)
 
         input_group_count = len(positive_groups) + len(negative_groups)
-        # create input data vector for groups based on membership
-        x_group_data = [1.0] * len(positive_groups) + [0.0] * len(negative_groups)
-        #for group_id in positive_samples.groupId.unique():
-        #    if user_group_data.is_user_in_group(user_id, group_id):
-        #        x_group_data.extend(1.0)
-        #    else:
-        #        x_group_data.extend(0)
-                
-        # extend for negative samples
-        #for group_id in negative_samples.groupId.unique():
-        #    if user_group_data.is_user_in_group(user_id, group_id):
-        #        x_group_data.extend(1.0)
-        #    else:
-        #        x_group_data.extend(0)
-        
+        if input_group_count > 0:
+            # create input data vector for groups based on membership
+            x_group_data = [1.0] * len(positive_groups) + [0.0] * len(negative_groups)
 
-        # Indices for the items
-        group_cols = positive_groups + negative_groups
-        group_rows = []
-        group_rows.extend(x_group_data * input_group_count)
-
-        x_group = sparse.coo_matrix((x_group_data * input_group_count,
-                               (group_rows, group_cols * input_group_count)),
-                              shape=(input_group_count, group_count),
-                              dtype=np.float32)
+            # Indices for the items
+            group_cols = positive_groups + negative_groups
+            group_rows = []
+            for i in range(input_group_count):
+                group_rows.extend([i] * input_group_count)
+    
+            x_group = sparse.coo_matrix((x_group_data * input_group_count,
+                                   (group_rows, group_cols * input_group_count)),
+                                  shape=(input_group_count, group_count),
+                                  dtype=np.float32)
+            
+            # vstack both the event and group matrices
+            diff_n_rows = 0
+            x_padded = x
+            x_group_padded = x_group
+            if x.shape[0] > x_group.shape[0]:
+                diff_n_rows = x.shape[0] - x_group.shape[0]
+                x_group_padded = sparse.vstack((x_group, sparse.csr_matrix((diff_n_rows, x_group.shape[1])))) 
+            elif x.shape[0] < x_group.shape[0]:
+                diff_n_rows = x_group.shape[0] - x.shape[0]
+                x_padded = sparse.vstack((x, sparse.csr_matrix((diff_n_rows, x.shape[1])))) 
+        else:
+            x_padded = x
+            x_group_padded = sparse.coo_matrix(shape=(input_count, group_count), dtype=np.float32)
+            
+        input_x = sparse.hstack((x_padded, x_group_padded))
         
-        # vstack both the event and group matrices
-        input_x = np.vstack((x, x_group))
         return input_x, y_targets, cols
 
 
@@ -255,17 +258,10 @@ class EventData(object):
 
     def sample_negative_on_context(self, df, user_id, count):
         """Sample uniformly items that are not observed
-<<<<<<< HEAD
-    
+        
         :param df: Dataframe to be sampled
         :param user_id: user id for which the samples are to be provided 
         :param count: negative item count
-=======
-
-        :param user_id: user id for which the
-        :param pos_item_map: set/list, listing all of the users observed items
-        :param max_items: int, item count
->>>>>>> c8792a7df758d300f96a4ba049c6d78cda70689a
         :returns: int negative item id
         """
         
