@@ -116,12 +116,18 @@ class EventData(object):
         # Indices for the items
         cols = positives + negatives
         rows = []
-        for i in range(input_count):
-            rows.extend([i] * input_count)
-
-        x = sparse.coo_matrix((x_data * input_count,
+        if negative_count > 0:
+            for i in range(input_count):
+                rows.extend([i] * input_count)
+            x = sparse.coo_matrix((x_data * input_count,
                                (rows, cols * input_count)),
                               shape=(input_count, event_count),
+                              dtype=np.float32)
+        else:
+            rows.extend([0] * input_count)
+            x = sparse.coo_matrix((x_data,
+                               (rows, cols)),
+                              shape=(1, event_count),
                               dtype=np.float32)
 
         # Negative targets are 0, positives are 1
