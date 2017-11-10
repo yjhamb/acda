@@ -34,7 +34,7 @@ class AutoEncoder(object):
         # Weights
         W = tf.get_variable('W', shape=[n_inputs, n_hidden])
         b = tf.get_variable('Bias', shape=[n_hidden])
-        
+
         # We want a size of [Number of Events, Latent Size]
         #event_weight_bias = tf.get_variable('EventBias', shape=[n_inputs, n_hidden])
         # We lookup a bias for each event
@@ -43,7 +43,7 @@ class AutoEncoder(object):
         # create hidden layer with default ReLU activation
         # fully_connected(self.x, n_hidden)
         hidden = tf.nn.relu(tf.nn.xw_plus_b(self.x, W, b))
-        
+
         # add weight regularizer
         self.reg_scale = 0.01
         self.weights_regularizer = tf.nn.l2_loss(W, "weight_loss")
@@ -72,11 +72,11 @@ def main():
     n_hidden = 50
     NEG_COUNT = 4
     CORRUPT_RATIO = 0.1
-    
+
     event_data = ds.EventData(ds.chicago_file_name)
     users = event_data.get_users()
     events = event_data.get_events()
-    
+
     # Convert the sparse event indices to a dense vector
     mlb = MultiLabelBinarizer()
     mlb.fit([events])
@@ -129,10 +129,12 @@ def main():
                 unique_user_test_events = event_data.get_user_unique_test_events(user_id)
                 test_event_index = [class_to_index[i] for i in unique_user_test_events]
                 x, _, _ = event_data.get_user_test_events(user_id, class_to_index)
+                # We replicate X, for the number of test events
+                x = np.tile(x.toarray().astype(np.float32), (len(test_event_index), 1))
 
                 # evaluate the model using the actuals
                 top_k_events = sess.run(model.top_k, {
-                    model.x: x.toarray().astype(np.float32),
+                    model.x: x,
                     model.actuals: test_event_index
                 })
 
