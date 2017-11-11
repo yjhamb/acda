@@ -145,12 +145,15 @@ def main():
                 valid_test_users = valid_test_users + 1
                 unique_user_test_events = event_data.get_user_unique_test_events(user_id)
                 test_event_index = [event_class_to_index[i] for i in unique_user_test_events]
-                x, _, _ = event_data.get_user_test_events_with_context(user_id, user_group_data, 
-                                                                   event_class_to_index, group_class_to_index)
+                x, _, _ = event_data.get_user_train_events_with_context(user_id, user_group_data, 
+                                                                   event_class_to_index, group_class_to_index, 
+                                                                   0, 0)
 
+                # We replicate X, for the number of test events
+                x = np.tile(x.toarray().astype(np.float32), (len(test_event_index), 1))
                 # evaluate the model using the actuals
                 top_k_events = sess.run(model.top_k, {
-                    model.x: x.toarray().astype(np.float32),
+                    model.x: x,
                     model.actuals: test_event_index
                 })
 

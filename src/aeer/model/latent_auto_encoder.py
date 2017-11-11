@@ -7,7 +7,7 @@ import os
 parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
 # parser.add_argument('-g', '--gpu', help='set gpu device number 0-3', type=str, default='3')
-parser.add_argument('-e', '--epochs', help='Number of epochs', type=int, default=30)
+parser.add_argument('-e', '--epochs', help='Number of epochs', type=int, default=4)
 parser.add_argument('-s', '--size', help='Number of hidden layer',
                     type=int, default=50)
 parser.add_argument('-n', '--neg_count', help='Number of negatives', type=int,
@@ -169,11 +169,15 @@ def main():
                     test_event_index = event_data.get_user_test_event_index(user_id)
                     #[event_data._event_class_to_index[i] for i in unique_user_test_events]
 
-                    x, _, _, group_id = event_data.get_user_test_events_with_group(user_id)
+                    x, _, _, group_id = event_data.get_user_train_events_with_group(user_id, 0, 0)
+                    
+                    # We replicate X, for the number of test events
+                    x = np.tile(x.toarray().astype(np.float32), (len(test_event_index), 1))
 
                     # evaluate the model using the actuals
                     top_k_events = sess.run(model.top_k, {
-                        model.x: x.toarray().astype(np.float32),
+                        #model.x: x.toarray().astype(np.float32),
+                        model.x: x,
                         model.actuals: test_event_index,
                         model.group_id: group_id,
                     })

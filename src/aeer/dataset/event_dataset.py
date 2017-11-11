@@ -197,12 +197,18 @@ class EventData(object):
         # Indices for the items
         cols = positive_events + negative_events
         rows = []
-        for i in range(input_count):
-            rows.extend([i] * input_count)
-        
-        x = sparse.coo_matrix((x_data * input_count,
+        if negative_count > 0:
+            for i in range(input_count):
+                rows.extend([i] * input_count)
+            x = sparse.coo_matrix((x_data * input_count,
                                (rows, cols * input_count)),
                               shape=(input_count, event_count),
+                              dtype=np.float32)
+        else:
+            rows.extend([0] * input_count)
+            x = sparse.coo_matrix((x_data,
+                               (rows, cols)),
+                              shape=(1, event_count),
                               dtype=np.float32)
 
         # Negative targets are 0, positives are 1
@@ -221,13 +227,21 @@ class EventData(object):
             # Indices for the items
             group_cols = positive_groups + negative_groups
             group_rows = []
-            for i in range(input_group_count):
-                group_rows.extend([i] * input_group_count)
-    
-            x_group = sparse.coo_matrix((x_group_data * input_group_count,
+            if negative_count > 0:
+                for i in range(input_group_count):
+                    group_rows.extend([i] * input_group_count)
+                x_group = sparse.coo_matrix((x_group_data * input_group_count,
                                    (group_rows, group_cols * input_group_count)),
                                   shape=(input_group_count, group_count),
                                   dtype=np.float32)
+            else:
+                group_rows.extend([0] * input_group_count)
+                x_group = sparse.coo_matrix((x_group_data,
+                                   (group_rows, group_cols)),
+                                  shape=(1, group_count),
+                                  dtype=np.float32)
+
+            
             
             # vstack both the event and group matrices
             diff_n_rows = 0
