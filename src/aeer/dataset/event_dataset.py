@@ -20,7 +20,6 @@ class EventData(object):
 
     def __init__(self, file_name):
         self.events = pd.read_csv(file_name)
-        self.events.loc[self.events['rsvpRating'] == -1, 'rsvpRating'] = 1
         # sort the event data by event time
         events_sorted = self.events.sort_values(['eventTime'], ascending=True)
         x = events_sorted.drop(['rsvpRating'], axis=1)
