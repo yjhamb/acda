@@ -28,7 +28,73 @@ class EventData(object):
 
         # perform the train-test split
         self.train_x, self.test_x, self.train_y, self.test_y = ms.train_test_split(x, y, test_size=0.2, random_state=42)
+        
+        self._n_users = len(self.get_users())
+        self._n_events = len(self.get_events())
+        self._n_groups = len(self.get_groups())
+        self._n_venues = len(self.get_venues())
 
+        # Convert the sparse event indices to a dense vector
+        mlb = MultiLabelBinarizer()
+        mlb.fit([self.get_events()])
+        # We need this to get the indices of events
+        self._event_class_to_index = dict(zip(mlb.classes_, range(len(mlb.classes_))))
+
+        # Convert the sparse group indices to a dense vector
+        mlb_group = MultiLabelBinarizer()
+        mlb_group.fit([self.get_groups()])
+        # We need this to get the indices of events
+        self._group_class_to_index = dict(zip(mlb_group.classes_, range(len(mlb_group.classes_))))
+
+    @property
+    def n_users(self):
+        """Return the number of users in the dataset"""
+        return self._n_users
+
+    @property
+    def n_events(self):
+        """Return the number of events in the dataset"""
+        return self._n_events
+
+    @property
+    def n_groups(self):
+        """Return the number of groups in the dataset"""
+        return self._n_groups
+
+    @property
+    def n_venues(self):
+        """Return the number of venues in the dataset"""
+        return self._n_venues
+
+    def get_user_test_event_index(self, user_id):
+        """
+        Get the converted index of user events
+        """
+        unique_user_test_events = self.test_x.eventId[self.test_x.memberId == user_id].unique()
+        return [self._event_class_to_index[i]
+                            for i in unique_user_test_events]
+
+    def get_user_test_events_with_group(self, user_id):
+        """
+        Get test event data with the groups for the user
+        """
+        groups = [self._group_class_to_index[i] for i in
+                  self.test_x[self.test_x.memberId == user_id].groupId.unique()]
+        # * is to unpack it and return a flat list of elements rather than a
+        # nested one
+        return (*self.get_user_events(user_id, self.test_x, self._event_class_to_index)), groups
+
+    def get_user_train_events_with_group(self, user_id, negative_count, corrupt_ratio):
+        """
+        Get train user events with the group for the user with negative counts
+        and corruption ratio
+        """
+        groups = [self._group_class_to_index[i] for i in
+                  self.train_x[self.train_x.memberId == user_id].groupId.unique()]
+        # * is to unpack it and return a flat list of elements rather than a
+        # nested one
+        return (*self.get_user_events(user_id, self.train_x, self._event_class_to_index,
+                                          negative_count, corrupt_ratio)), groups
 
     def get_users(self):
         return self.events.memberId.unique()
@@ -323,80 +389,6 @@ class EventData(object):
         item_ids = [df.eventId[df.memberId == uid].unique() for uid in user_ids
                     if len(df.eventId[df.memberId == uid].unique()) > 0]
         return mlb.transform(item_ids), item_ids
-
-
-class EventDataWithGroups(EventData):
-
-    """Inherits EventData"""
-    def __init__(self, file_name):
-        super(EventDataWithGroups, self).__init__(file_name)
-        self._n_users = len(self.get_users())
-        self._n_events = len(self.get_events())
-        self._n_groups = len(self.get_groups())
-        self._n_venues = len(self.get_venues())
-
-        # Convert the sparse event indices to a dense vector
-        mlb = MultiLabelBinarizer()
-        mlb.fit([self.get_events()])
-        # We need this to get the indices of events
-        self._event_class_to_index = dict(zip(mlb.classes_, range(len(mlb.classes_))))
-
-        # Convert the sparse group indices to a dense vector
-        mlb_group = MultiLabelBinarizer()
-        mlb_group.fit([self.get_groups()])
-        # We need this to get the indices of events
-        self._group_class_to_index = dict(zip(mlb_group.classes_, range(len(mlb_group.classes_))))
-
-
-    @property
-    def n_users(self):
-        """Return the number of users in the dataset"""
-        return self._n_users
-
-    @property
-    def n_events(self):
-        """Return the number of events in the dataset"""
-        return self._n_events
-
-    @property
-    def n_groups(self):
-        """Return the number of groups in the dataset"""
-        return self._n_groups
-
-    @property
-    def n_venues(self):
-        """Return the number of venues in the dataset"""
-        return self._n_venues
-
-    def get_user_test_event_index(self, user_id):
-        """
-        Get the converted index of user events
-        """
-        unique_user_test_events = self.test_x.eventId[self.test_x.memberId == user_id].unique()
-        return [self._event_class_to_index[i]
-                            for i in unique_user_test_events]
-
-    def get_user_test_events_with_group(self, user_id):
-        """
-        Get test event data with the groups for the user
-        """
-        groups = [self._group_class_to_index[i] for i in
-                  self.test_x[self.test_x.memberId == user_id].groupId.unique()]
-        # * is to unpack it and return a flat list of elements rather than a
-        # nested one
-        return (*self.get_user_events(user_id, self.test_x, self._event_class_to_index)), groups
-
-    def get_user_train_events_with_group(self, user_id, negative_count, corrupt_ratio):
-        """
-        Get train user events with the group for the user with negative counts
-        and corruption ratio
-        """
-        groups = [self._group_class_to_index[i] for i in
-                  self.train_x[self.train_x.memberId == user_id].groupId.unique()]
-        # * is to unpack it and return a flat list of elements rather than a
-        # nested one
-        return (*self.get_user_events(user_id, self.train_x, self._event_class_to_index,
-                                          negative_count, corrupt_ratio)), groups
 
 
 def main():

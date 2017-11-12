@@ -4,6 +4,14 @@ contextual group and venue data
 '''
 import argparse
 import os
+
+import aeer.dataset.event_dataset as ds
+import tensorflow as tf
+from tensorflow.contrib.layers import fully_connected
+
+import numpy as np
+from sklearn.utils import shuffle
+
 parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
 # parser.add_argument('-g', '--gpu', help='set gpu device number 0-3', type=str, default='3')
@@ -17,16 +25,6 @@ parser.add_argument('-c', '--corrupt', help='Corruption ratio', type=float,
 FLAGS = parser.parse_args()
 
 os.environ['CUDA_VISIBLE_DEVICES'] = '3'
-
-import aeer.dataset.event_dataset as ds
-import aeer.dataset.user_group_dataset as user_group_ds
-import tensorflow as tf
-from tensorflow.contrib.layers import fully_connected
-
-import numpy as np
-from sklearn.preprocessing import MultiLabelBinarizer
-from sklearn.utils import shuffle
-
 
 class LatentFactorAutoEncoder(object):
 
@@ -98,23 +96,8 @@ def main():
     NEG_COUNT = FLAGS.neg_count
     CORRUPT_RATIO = FLAGS.corrupt
 
-    event_data = ds.EventDataWithGroups(ds.chicago_file_name)
+    event_data = ds.EventData(ds.chicago_file_name)
     users = event_data.get_users()
-    events = event_data.get_events()
-    groups = event_data.get_groups()
-
-
-    # Convert the sparse event indices to a dense vector
-    # mlb = MultiLabelBinarizer()
-    # mlb.fit([events])
-    # # We need this to get the indices of events
-    # event_class_to_index = dict(zip(mlb.classes_, range(len(mlb.classes_))))
-
-    # # Convert the sparse group indices to a dense vector
-    # mlb_group = MultiLabelBinarizer()
-    # mlb_group.fit([groups])
-    # # We need this to get the indices of events
-    # group_class_to_index = dict(zip(mlb_group.classes_, range(len(mlb_group.classes_))))
 
     n_inputs = event_data.n_events
     n_groups = event_data.n_groups
