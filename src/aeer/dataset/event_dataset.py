@@ -42,8 +42,14 @@ class EventData(object):
         # Convert the sparse group indices to a dense vector
         mlb_group = MultiLabelBinarizer()
         mlb_group.fit([self.get_groups()])
-        # We need this to get the indices of events
+        # We need this to get the indices of groups
         self._group_class_to_index = dict(zip(mlb_group.classes_, range(len(mlb_group.classes_))))
+        
+        # Convert the sparse group indices to a dense vector
+        mlb_venue = MultiLabelBinarizer()
+        mlb_venue.fit([self.get_venues()])
+        # We need this to get the indices of venues
+        self._venue_class_to_index = dict(zip(mlb_venue.classes_, range(len(mlb_venue.classes_))))
 
     @property
     def n_users(self):
@@ -131,21 +137,21 @@ class EventData(object):
         return self.test_x.eventId[self.test_x.memberId == user_id].unique()
 
 
-    def get_user_train_events(self, user_id, class_to_index, negative_count, corrupt_ratio):
+    def get_user_train_events(self, user_id, negative_count, corrupt_ratio):
         """
         Calls the get_user_events method with the training data
         """
-        return self.get_user_events(user_id, self.train_x, class_to_index, negative_count, corrupt_ratio)
+        return self.get_user_events(user_id, self.train_x, negative_count, corrupt_ratio)
 
 
-    def get_user_test_events(self, user_id, class_to_index):
+    def get_user_test_events(self, user_id):
         """
         Calls the get_user_events method with the test data
         """
-        return self.get_user_events(user_id, self.test_x, class_to_index)
+        return self.get_user_events(user_id, self.test_x)
 
 
-    def get_user_events(self, user_id, df, class_to_index, negative_count=0, corrupt_ratio=0):
+    def get_user_events(self, user_id, df, negative_count=0, corrupt_ratio=0):
         """
         This will get a single users events (training or test based on input parameter).
         We encode each user with a k-hot encoding, where a 1 if they have rated the item.
@@ -155,16 +161,15 @@ class EventData(object):
 
         :param user_id: user id in dataframe
         :param df: the dataframe for training or test
-        :param class_to_index: dictionary that maps item ids to indices
         :param negative_count: int, ratio of negative samples
         :param corrupt_ratio: float, [0, 1] the probability of corrupting samples
         :returns: Encoded User Vector, Y Target, item ids
         """
 
-        event_count = len(class_to_index)
+        event_count = self.n_events
 
         # Get all positive items
-        positives = [class_to_index[i] for i in df.eventId[df.memberId == user_id].unique()]
+        positives = [self._events_class_to_index[i] for i in df.eventId[df.memberId == user_id].unique()]
 
         # Sample negative items
         if negative_count > 0:
@@ -206,21 +211,21 @@ class EventData(object):
         return x, y_targets, cols
 
 
-    def get_user_train_events_with_context(self, user_id, user_group_data, event_class_to_index, group_class_to_index, negative_count, corrupt_ratio):
+    def get_user_train_events_with_context(self, user_id, negative_count=0, corrupt_ratio=0):
         """
         Calls the get_user_events method with the training data
         """
-        return self.get_user_events_with_context(user_id, self.train_x, user_group_data, event_class_to_index, group_class_to_index, negative_count, corrupt_ratio)
+        return self.get_user_events_with_context(user_id, self.train_x, negative_count, corrupt_ratio)
 
 
-    def get_user_test_events_with_context(self, user_id, user_group_data, event_class_to_index, group_class_to_index):
+    def get_user_test_events_with_context(self, user_id):
         """
         Calls the get_user_events method with the test data
         """
-        return self.get_user_events_with_context(user_id, self.test_x, user_group_data, event_class_to_index, group_class_to_index)
+        return self.get_user_events_with_context(user_id, self.test_x)
 
 
-    def get_user_events_with_context(self, user_id, df, user_group_data, event_class_to_index, group_class_to_index, negative_count=0, corrupt_ratio=0):
+    def get_user_events_with_context(self, user_id, df, negative_count=0, corrupt_ratio=0):
         """
         This will get a single users events (training or test based on input parameter).
         We encode each user with a k-hot encoding, where a 1 if they have rated the item.
@@ -230,28 +235,30 @@ class EventData(object):
 
         :param user_id: user id in dataframe
         :param df: the dataframe for training or test
-        :param event_class_to_index: dictionary that maps event ids to indices
-        :param group_class_to_index: dictionary that maps group ids to indices
         :param negative_count: int, ratio of negative samples
         :param corrupt_ratio: float, [0, 1] the probability of corrupting samples
         :returns: Encoded User Vector, Y Target, item ids
         """
 
-        event_count = len(event_class_to_index)
-        group_count = len(group_class_to_index)
+        event_count = self.n_events
+        group_count = self.n_groups
+        venue_count = self.n_venues
 
         # Get all positive items
         positive_samples = df[df.memberId == user_id]
-        positive_events = [event_class_to_index[i] for i in positive_samples.eventId.unique()]
-        positive_groups = [group_class_to_index[i] for i in positive_samples.groupId.unique()]
+        positive_events = [self._event_class_to_index[i] for i in positive_samples.eventId.unique()]
+        positive_groups = [self._group_class_to_index[i] for i in positive_samples.groupId.unique()]
+        positive_venues = [self._venue_class_to_index[i] for i in positive_samples.venueId.unique()]
 
         # Sample negative items
         negative_events = []
         negative_groups = []
+        negative_venues = []
         if negative_count > 0:
             negative_samples = self.sample_negative_on_context(df, user_id, negative_count)
-            negative_events = [event_class_to_index[i] for i in negative_samples.eventId.unique()]
-            negative_groups = [group_class_to_index[i] for i in negative_samples.groupId.unique()]
+            negative_events = [self._event_class_to_index[i] for i in negative_samples.eventId.unique()]
+            negative_groups = [self._group_class_to_index[i] for i in negative_samples.groupId.unique()]
+            negative_venues = [self._venue_class_to_index[i] for i in negative_samples.venueId.unique()]
             
         input_count = len(positive_events) + len(negative_events)
 
@@ -286,7 +293,7 @@ class EventData(object):
 
         input_group_count = len(positive_groups) + len(negative_groups)
         if input_group_count > 0:
-            # create input data vector for groups based on membership
+            # create input data vector for the groups
             x_group_data = [1.0] * len(positive_groups) + [0.0] * len(negative_groups)
 
             # Indices for the items
@@ -305,8 +312,6 @@ class EventData(object):
                                    (group_rows, group_cols)),
                                   shape=(1, group_count),
                                   dtype=np.float32)
-
-            
             
             # vstack both the event and group matrices
             diff_n_rows = 0
@@ -324,7 +329,45 @@ class EventData(object):
             
         input_x = sparse.hstack((x_padded, x_group_padded))
         
-        return input_x, y_targets, cols
+        input_venue_count = len(positive_venues) + len(negative_venues)
+        if input_venue_count > 0:
+            # create input data vector for the venues
+            x_venue_data = [1.0] * len(positive_venues) + [0.0] * len(negative_venues)
+
+            # Indices for the items
+            venue_cols = positive_venues + negative_venues
+            venue_rows = []
+            if negative_count > 0:
+                for i in range(input_venue_count):
+                    venue_rows.extend([i] * input_venue_count)
+                x_venue = sparse.coo_matrix((x_venue_data * input_venue_count,
+                                   (venue_rows, venue_cols * input_venue_count)),
+                                  shape=(input_venue_count, venue_count),
+                                  dtype=np.float32)
+            else:
+                venue_rows.extend([0] * input_venue_count)
+                x_venue = sparse.coo_matrix((x_venue_data,
+                                   (venue_rows, venue_cols)),
+                                  shape=(1, venue_count),
+                                  dtype=np.float32)
+            
+            # vstack both the event and group matrices
+            diff_n_rows = 0
+            x_padded_input = input_x
+            x_venue_padded = x_venue
+            if input_x.shape[0] > x_venue.shape[0]:
+                diff_n_rows = input_x.shape[0] - x_venue.shape[0]
+                x_venue_padded = sparse.vstack((x_venue, sparse.csr_matrix((diff_n_rows, x_venue.shape[1])))) 
+            elif input_x.shape[0] < x_venue.shape[0]:
+                diff_n_rows = x_venue.shape[0] - input_x.shape[0]
+                x_padded_input = sparse.vstack((input_x, sparse.csr_matrix((diff_n_rows, input_x.shape[1])))) 
+        else:
+            x_padded_input = input_x
+            x_venue_padded = sparse.coo_matrix(shape=(input_count + input_group_count, venue_count), dtype=np.float32)
+            
+        input_x_final = sparse.hstack((x_padded_input, x_venue_padded))
+        
+        return input_x_final, y_targets, cols
 
 
     def sample_negative(self, pos_item_map, max_items):

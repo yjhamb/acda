@@ -28,7 +28,7 @@ os.environ['CUDA_VISIBLE_DEVICES'] = '3'
 
 class LatentFactorAutoEncoder(object):
 
-    def __init__(self, n_inputs, n_hidden, n_outputs, n_groups, #n_venues,
+    def __init__(self, n_inputs, n_hidden, n_outputs, n_groups, n_venues,
                  learning_rate=0.001):
 
         self.x = tf.placeholder(tf.float32, shape=[None, n_inputs])
