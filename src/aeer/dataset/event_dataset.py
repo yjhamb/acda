@@ -96,6 +96,10 @@ class EventData(object):
         """
         groups = [self._group_class_to_index[i] for i in
                   self.train_x[self.train_x.memberId == user_id].groupId.unique()]
+        
+        venues = [self._venue_class_to_index[i] for i in
+                  self.train_x[self.train_x.memberId == user_id].venueId.unique()]
+        
         # * is to unpack it and return a flat list of elements rather than a
         # nested one
         return (*self.get_user_events(user_id, self.train_x, self._event_class_to_index,

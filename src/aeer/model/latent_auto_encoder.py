@@ -33,7 +33,7 @@ class LatentFactorAutoEncoder(object):
 
         self.x = tf.placeholder(tf.float32, shape=[None, n_inputs])
         self.group_id = tf.placeholder(tf.int32, shape=[None])
-        #self.venue_id = tf.placeholder(tf.int32, shape=[None])
+        self.venue_id = tf.placeholder(tf.int32, shape=[None])
 
         # We need to gather the indices from the matrix where our outputs are
         self.gather_indices = tf.placeholder(tf.int32, shape=[None, 2])
@@ -47,14 +47,14 @@ class LatentFactorAutoEncoder(object):
         # Uniform Initialization U(-eps, eps)
         eps = 0.01
 
-        # venue_bias = tf.get_variable('VenueBias', shape=[n_venues, n_hidden],
-        #                              initializer=tf.random_uniform_initializer(-eps, eps))
+        venue_bias = tf.get_variable('VenueBias', shape=[n_venues, n_hidden],
+                                    initializer=tf.random_uniform_initializer(-eps, eps))
         group_bias = tf.get_variable('GroupBias', shape=[n_groups, n_hidden],
-                                     initializer=tf.random_uniform_initializer(-eps, eps))
+                                    initializer=tf.random_uniform_initializer(-eps, eps))
 
         # We lookup a bias for each
-        # self.venue_factor = tf.nn.embedding_lookup(venue_bias, self.venue_id,
-        #                                            name='VenueLookup')
+        self.venue_factor = tf.nn.embedding_lookup(venue_bias, self.venue_id,
+                                                    name='VenueLookup')
         self.group_factor = tf.nn.embedding_lookup(group_bias, self.group_id,
                                                    name='GroupLookup')
         # Sum all group factors, then make it a vector so it will broadcast
@@ -62,8 +62,7 @@ class LatentFactorAutoEncoder(object):
         group_factor = tf.squeeze(tf.reduce_sum(self.group_factor, axis=0))
 
         # Wx + b + venue + user groups
-        preactivation = tf.nn.xw_plus_b(self.x, W, b) + group_factor
-        # self.venue_factor +
+        preactivation = tf.nn.xw_plus_b(self.x, W, b) + group_factor + self.venue_factor
 
         hidden = tf.nn.relu(preactivation)
 
@@ -102,8 +101,9 @@ def main():
     n_inputs = event_data.n_events
     n_groups = event_data.n_groups
     n_outputs = event_data.n_events
+    n_venues = event_data.n_venues
 
-    model = LatentFactorAutoEncoder(n_inputs, n_hidden, n_outputs, n_groups,
+    model = LatentFactorAutoEncoder(n_inputs, n_hidden, n_outputs, n_groups, n_venues,
                                     learning_rate=0.001)
 
     init = tf.global_variables_initializer()
@@ -120,7 +120,7 @@ def main():
             users = shuffle(users)
 
             for user_id in users:
-                x, y, item, group_id = event_data.get_user_train_events_with_group(user_id, NEG_COUNT, CORRUPT_RATIO)
+                x, y, item, group_id, venue_id = event_data.get_user_train_events_with_group(user_id, NEG_COUNT, CORRUPT_RATIO)
 
                 # We only compute loss on events we used as inputs
                 # Each row is to index the first dimension
@@ -131,6 +131,7 @@ def main():
                     model.x: x.toarray().astype(np.float32),
                     model.gather_indices: gather_indices,
                     model.group_id: group_id,
+                    model.venue_id: venue_id,
                     model.y: y
                 })
 
@@ -152,7 +153,7 @@ def main():
                     test_event_index = event_data.get_user_test_event_index(user_id)
                     #[event_data._event_class_to_index[i] for i in unique_user_test_events]
 
-                    x, _, _, group_id = event_data.get_user_train_events_with_group(user_id, 0, 0)
+                    x, _, _, group_id, venue_id = event_data.get_user_train_events_with_group(user_id, 0, 0)
                     
                     # We replicate X, for the number of test events
                     x = np.tile(x.toarray().astype(np.float32), (len(test_event_index), 1))
@@ -163,6 +164,7 @@ def main():
                         model.x: x,
                         model.actuals: test_event_index,
                         model.group_id: group_id,
+                        model.venue_id: venue_id,
                     })
 
                     precision = precision + np.sum(top_k_events)
