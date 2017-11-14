@@ -60,9 +60,10 @@ class LatentFactorAutoEncoder(object):
         # Sum all group factors, then make it a vector so it will broadcast
         # and add it to all instances
         group_factor = tf.squeeze(tf.reduce_sum(self.group_factor, axis=0))
+        venue_factor = tf.squeeze(tf.reduce_sum(self.venue_factor, axis=0))
 
         # Wx + b + venue + user groups
-        preactivation = tf.nn.xw_plus_b(self.x, W, b) + group_factor + self.venue_factor
+        preactivation = tf.nn.xw_plus_b(self.x, W, b) + group_factor + venue_factor
 
         hidden = tf.nn.relu(preactivation)
 
