@@ -102,8 +102,8 @@ class EventData(object):
         
         # * is to unpack it and return a flat list of elements rather than a
         # nested one
-        return (*self.get_user_events(user_id, self.train_x, self._event_class_to_index,
-                                          negative_count, corrupt_ratio)), groups
+        return (*self.get_user_events(user_id, self.train_x, negative_count, 
+                                      corrupt_ratio)), groups, venues
 
     def get_users(self):
         return self.events.memberId.unique()
@@ -173,7 +173,7 @@ class EventData(object):
         event_count = self.n_events
 
         # Get all positive items
-        positives = [self._events_class_to_index[i] for i in df.eventId[df.memberId == user_id].unique()]
+        positives = [self._event_class_to_index[i] for i in df.eventId[df.memberId == user_id].unique()]
 
         # Sample negative items
         if negative_count > 0:
