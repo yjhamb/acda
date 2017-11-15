@@ -14,8 +14,8 @@ from sklearn.utils import shuffle
 
 parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
-# parser.add_argument('-g', '--gpu', help='set gpu device number 0-3', type=str, default='3')
-parser.add_argument('-e', '--epochs', help='Number of epochs', type=int, default=4)
+parser.add_argument('-g', '--gpu', help='set gpu device number 0-3', type=str, default='3')
+parser.add_argument('-e', '--epochs', help='Number of epochs', type=int, default=20)
 parser.add_argument('-s', '--size', help='Number of hidden layer',
                     type=int, default=50)
 parser.add_argument('-n', '--neg_count', help='Number of negatives', type=int,
@@ -24,7 +24,7 @@ parser.add_argument('-c', '--corrupt', help='Corruption ratio', type=float,
                     default=0.1)
 FLAGS = parser.parse_args()
 
-os.environ['CUDA_VISIBLE_DEVICES'] = '3'
+os.environ['CUDA_VISIBLE_DEVICES'] = FLAGS.gpu
 
 class LatentFactorAutoEncoder(object):
 
@@ -73,7 +73,7 @@ class LatentFactorAutoEncoder(object):
         #self.reg_loss = tf.reduce_sum(tf.abs(W))
 
         # create the output layer with no activation function
-        self.outputs = fully_connected(hidden, n_outputs, activation_fn=None)
+        self.outputs = fully_connected(hidden, n_outputs, activation_fn=tf.nn.sigmoid)
 
         self.targets = tf.gather_nd(self.outputs, self.gather_indices)
 
@@ -155,7 +155,7 @@ def main():
                     #[event_data._event_class_to_index[i] for i in unique_user_test_events]
 
                     x, _, _, group_id, venue_id = event_data.get_user_train_events_with_group(user_id, 0, 0)
-                    
+
                     # We replicate X, for the number of test events
                     x = np.tile(x.toarray().astype(np.float32), (len(test_event_index), 1))
 
@@ -173,7 +173,6 @@ def main():
             avg_precision = 0
             if (valid_test_users > 0):
                 avg_precision = precision / valid_test_users
-
             print("Precision: {:,.6f}".format(avg_precision))
 
 
