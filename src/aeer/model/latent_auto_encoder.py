@@ -15,7 +15,7 @@ from sklearn.utils import shuffle
 parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
 parser.add_argument('-g', '--gpu', help='set gpu device number 0-3', type=str, default='3')
-parser.add_argument('-e', '--epochs', help='Number of epochs', type=int, default=20)
+parser.add_argument('-e', '--epochs', help='Number of epochs', type=int, default=5)
 parser.add_argument('-s', '--size', help='Number of hidden layer',
                     type=int, default=50)
 parser.add_argument('-n', '--neg_count', help='Number of negatives', type=int,
@@ -77,10 +77,13 @@ class LatentFactorAutoEncoder(object):
 
         self.targets = tf.gather_nd(self.outputs, self.gather_indices)
 
-        self.actuals = tf.placeholder(tf.int32, shape=[None])
+        self.actuals = tf.placeholder(tf.int64, shape=[None])
 
-        # evaluate top k wrt outputs and actuals
-        self.top_k = tf.nn.in_top_k(self.outputs, self.actuals, k=10)
+        # evaluate metrics outputs and actuals
+        self.precision_at_5 = tf.nn.in_top_k(self.outputs, self.actuals, k=5)
+        self.precision_at_10 = tf.nn.in_top_k(self.outputs, self.actuals, k=10)
+        self.recall_at_5 = tf.metrics.recall_at_k(self.actuals, self.outputs, k=5)
+        self.recall_at_10 = tf.metrics.recall_at_k(self.actuals, self.outputs, k=10)
 
         # square loss
         #self.loss = tf.losses.mean_squared_error(self.targets, self.y) + self.reg_scale * self.weights_regularizer
@@ -108,6 +111,7 @@ def main():
                                     learning_rate=0.001)
 
     init = tf.global_variables_initializer()
+    init_local = tf.local_variables_initializer()
 
     tf_config = tf.ConfigProto(
         gpu_options=tf.GPUOptions(per_process_gpu_memory_fraction=0.25,
@@ -115,6 +119,7 @@ def main():
 
     with tf.Session(config=tf_config) as sess:
         init.run()
+        init_local.run()
         for epoch in range(n_epochs):
             # additive gaussian noise or multiplicative mask-out/drop-out noise
             epoch_loss = 0.0
@@ -143,7 +148,10 @@ def main():
 
             # evaluate the model on the test set
             test_users = event_data.get_test_users()
-            precision = 0
+            precision_5 = 0
+            precision_10 = 0
+            recall_5 = 0
+            recall_10 = 0
             valid_test_users = 0
             for user_id in test_users:
                 # check if user was present in training data
@@ -160,21 +168,35 @@ def main():
                     x = np.tile(x.toarray().astype(np.float32), (len(test_event_index), 1))
 
                     # evaluate the model using the actuals
-                    top_k_events = sess.run(model.top_k, {
-                        #model.x: x.toarray().astype(np.float32),
+                    precision_at_5, precision_at_10, recall_at_5, recall_at_10 = sess.run([model.precision_at_5, 
+                                                                                           model.precision_at_10,
+                                                                                           model.recall_at_5,
+                                                                                           model.recall_at_10], {
                         model.x: x,
                         model.actuals: test_event_index,
                         model.group_id: group_id,
                         model.venue_id: venue_id,
                     })
 
-                    precision = precision + np.sum(top_k_events)
+                    precision_5 = precision_5 + np.sum(precision_at_5)
+                    precision_10 = precision_10 + np.sum(precision_at_10)
+                    recall_5 = recall_5 + np.sum(recall_at_5)
+                    recall_10 = recall_10 + np.sum(recall_at_10)
 
-            avg_precision = 0
-            if (valid_test_users > 0):
-                avg_precision = precision / valid_test_users
-            print("Precision: {:,.6f}".format(avg_precision))
-
+            avg_precision_5 = 0
+            avg_precision_10 = 0
+            avg_recall_5 = 0
+            avg_recall_10 = 0
+            if valid_test_users > 0:
+                avg_precision_5 = precision_5 / valid_test_users
+                avg_precision_10 = precision_10 / valid_test_users
+                avg_recall_5 = recall_5 / valid_test_users
+                avg_recall_10 = recall_10 / valid_test_users
+                
+            print("Precision@5: {:,.6f}".format(avg_precision_5))
+            print("Precision@10: {:,.6f}".format(avg_precision_10))
+            print("Recall@5: {:,.6f}".format(avg_recall_5))
+            print("Recall@10: {:,.6f}".format(avg_recall_10))
 
 
 if __name__ == '__main__':
