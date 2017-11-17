@@ -12,6 +12,7 @@ from tensorflow.contrib.layers import fully_connected
 import numpy as np
 from sklearn.utils import shuffle
 
+from utils import ACTIVATION_FN
 """
 Example Usage:
 
@@ -33,6 +34,16 @@ parser.add_argument('-c', '--corrupt', help='Corruption ratio', type=float,
 # Pass the Flag to disable
 parser.add_argument('--nogroup', help='disable group latent factor', action="store_true")
 parser.add_argument('--novenue', help='disable venue latent factor', action="store_true")
+
+activation_fn_names = ACTIVATION_FN.keys()
+parser.add_argument('--hidden_fn',
+                    help='hidden activation function to use',
+                    default='relu', type=str, choices=activation_fn_names)
+
+parser.add_argument('--output_fn',
+                    help='output activation function to use',
+                    default='sigmoid', type=str, choices=activation_fn_names)
+
 FLAGS = parser.parse_args()
 
 os.environ['CUDA_VISIBLE_DEVICES'] = FLAGS.gpu
@@ -40,6 +51,7 @@ os.environ['CUDA_VISIBLE_DEVICES'] = FLAGS.gpu
 class LatentFactorAutoEncoder(object):
 
     def __init__(self, n_inputs, n_hidden, n_outputs, n_groups, n_venues,
+                 hidden_activation='relu', output_activation='sigmoid',
                  learning_rate=0.001):
         """
 
@@ -90,7 +102,7 @@ class LatentFactorAutoEncoder(object):
             group_factor = tf.squeeze(tf.reduce_sum(self.group_factor, axis=0))
             preactivation += group_factor
 
-        hidden = tf.nn.relu(preactivation)
+        hidden = ACTIVATION_FN[hidden_activation](preactivation)
 
         # add weight regularizer
         # self.reg_scale = 0.01
@@ -98,7 +110,8 @@ class LatentFactorAutoEncoder(object):
         #self.reg_loss = tf.reduce_sum(tf.abs(W))
 
         # create the output layer with no activation function
-        self.outputs = fully_connected(hidden, n_outputs, activation_fn=tf.nn.sigmoid)
+        self.outputs = fully_connected(hidden, n_outputs,
+                                       activation_fn=ACTIVATION_FN[output_activation])
 
         self.targets = tf.gather_nd(self.outputs, self.gather_indices)
 
@@ -142,6 +155,7 @@ def main():
         n_venues = None
 
     model = LatentFactorAutoEncoder(n_inputs, n_hidden, n_outputs, n_groups, n_venues,
+                                    FLAGS.hidden_fn, FLAGS.output_fn,
                                     learning_rate=0.001)
 
     init = tf.global_variables_initializer()
