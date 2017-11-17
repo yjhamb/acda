@@ -12,8 +12,16 @@ from tensorflow.contrib.layers import fully_connected
 import numpy as np
 from sklearn.utils import shuffle
 
-parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+"""
+Example Usage:
 
+Run for 20 epochs, 100 hidden units and a 0.5 corruption ratio
+python latent_auto_encoder.py --epochs 20 --size 100 --corrupt 0.5
+
+To turn off latent factors, eg for group latent factor
+python latent_auto_encoder.py --nogroup
+"""
+parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument('-g', '--gpu', help='set gpu device number 0-3', type=str, default='3')
 parser.add_argument('-e', '--epochs', help='Number of epochs', type=int, default=5)
 parser.add_argument('-s', '--size', help='Number of hidden layer',
@@ -22,6 +30,9 @@ parser.add_argument('-n', '--neg_count', help='Number of negatives', type=int,
                     default=4)
 parser.add_argument('-c', '--corrupt', help='Corruption ratio', type=float,
                     default=0.1)
+# Pass the Flag to disable
+parser.add_argument('--nogroup', help='disable group latent factor', action="store_true")
+parser.add_argument('--novenue', help='disable venue latent factor', action="store_true")
 FLAGS = parser.parse_args()
 
 os.environ['CUDA_VISIBLE_DEVICES'] = FLAGS.gpu
@@ -30,7 +41,15 @@ class LatentFactorAutoEncoder(object):
 
     def __init__(self, n_inputs, n_hidden, n_outputs, n_groups, n_venues,
                  learning_rate=0.001):
+        """
 
+        :param n_inputs: int, Number of input features (number of events)
+        :param n_hidden: int, Number of hidden units
+        :param n_outputs: int, Number of output features (number of events)
+        :param n_groups: int, Number of groups or None to disable
+        :param n_venues: int, Number of venues or None to disable
+        :param learning_rate: float, Step size
+        """
         self.x = tf.placeholder(tf.float32, shape=[None, n_inputs])
         self.group_id = tf.placeholder(tf.int32, shape=[None])
         self.venue_id = tf.placeholder(tf.int32, shape=[None])
@@ -47,23 +66,29 @@ class LatentFactorAutoEncoder(object):
         # Uniform Initialization U(-eps, eps)
         eps = 0.01
 
-        venue_bias = tf.get_variable('VenueBias', shape=[n_venues, n_hidden],
-                                    initializer=tf.random_uniform_initializer(-eps, eps))
-        group_bias = tf.get_variable('GroupBias', shape=[n_groups, n_hidden],
-                                    initializer=tf.random_uniform_initializer(-eps, eps))
-
-        # We lookup a bias for each
-        self.venue_factor = tf.nn.embedding_lookup(venue_bias, self.venue_id,
-                                                    name='VenueLookup')
-        self.group_factor = tf.nn.embedding_lookup(group_bias, self.group_id,
-                                                   name='GroupLookup')
-        # Sum all group factors, then make it a vector so it will broadcast
-        # and add it to all instances
-        group_factor = tf.squeeze(tf.reduce_sum(self.group_factor, axis=0))
-        venue_factor = tf.squeeze(tf.reduce_sum(self.venue_factor, axis=0))
-
         # Wx + b + venue + user groups
-        preactivation = tf.nn.xw_plus_b(self.x, W, b) + group_factor + venue_factor
+        preactivation = tf.nn.xw_plus_b(self.x, W, b)
+
+        # Add venue latent factor
+        if n_venues is not None:
+            # Create and lookup each bias
+            venue_bias = tf.get_variable('VenueBias', shape=[n_venues, n_hidden],
+                                         initializer=tf.random_uniform_initializer(-eps, eps))
+            self.venue_factor = tf.nn.embedding_lookup(venue_bias, self.venue_id,
+                                                       name='VenueLookup')
+            # Sum all group factors, then make it a vector so it will broadcast
+            # and add it to all instances
+            venue_factor = tf.squeeze(tf.reduce_sum(self.venue_factor, axis=0))
+            preactivation += venue_factor
+
+        # Add group latent factor
+        if n_groups is not None:
+            group_bias = tf.get_variable('GroupBias', shape=[n_groups, n_hidden],
+                                         initializer=tf.random_uniform_initializer(-eps, eps))
+            self.group_factor = tf.nn.embedding_lookup(group_bias, self.group_id,
+                                                       name='GroupLookup')
+            group_factor = tf.squeeze(tf.reduce_sum(self.group_factor, axis=0))
+            preactivation += group_factor
 
         hidden = tf.nn.relu(preactivation)
 
@@ -106,6 +131,15 @@ def main():
     n_groups = event_data.n_groups
     n_outputs = event_data.n_events
     n_venues = event_data.n_venues
+
+    # We set to None to turn off the group/venue latent factors
+    if FLAGS.nogroup:
+        print("Disabling Group Latent Factor")
+        n_groups = None
+
+    if FLAGS.novenue:
+        print("Disabling Venue Latent Factor")
+        n_venues = None
 
     model = LatentFactorAutoEncoder(n_inputs, n_hidden, n_outputs, n_groups, n_venues,
                                     learning_rate=0.001)
@@ -168,7 +202,7 @@ def main():
                     x = np.tile(x.toarray().astype(np.float32), (len(test_event_index), 1))
 
                     # evaluate the model using the actuals
-                    precision_at_5, precision_at_10, recall_at_5, recall_at_10 = sess.run([model.precision_at_5, 
+                    precision_at_5, precision_at_10, recall_at_5, recall_at_10 = sess.run([model.precision_at_5,
                                                                                            model.precision_at_10,
                                                                                            model.recall_at_5,
                                                                                            model.recall_at_10], {
@@ -192,12 +226,11 @@ def main():
                 avg_precision_10 = precision_10 / valid_test_users
                 avg_recall_5 = recall_5 / valid_test_users
                 avg_recall_10 = recall_10 / valid_test_users
-                
-            print("Precision@5: {:,.6f}".format(avg_precision_5))
-            print("Precision@10: {:,.6f}".format(avg_precision_10))
-            print("Recall@5: {:,.6f}".format(avg_recall_5))
-            print("Recall@10: {:,.6f}".format(avg_recall_10))
 
+            # Directly access variables
+            print(f"Precision@5: {avg_precision_5:>10.6f}       Precision@10: {avg_precision_10:>10.6f}")
+            print(f"Recall@5:    {avg_recall_5:>10.6f}       Recall@10:    {avg_recall_10:>10.6f}")
+            print()
 
 if __name__ == '__main__':
     main()
