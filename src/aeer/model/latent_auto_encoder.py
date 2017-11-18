@@ -12,7 +12,7 @@ from tensorflow.contrib.layers import fully_connected
 import numpy as np
 from sklearn.utils import shuffle
 
-from utils import ACTIVATION_FN
+from aeer.model.utils import ACTIVATION_FN
 """
 Example Usage:
 
@@ -226,10 +226,10 @@ def main():
                         model.venue_id: venue_id,
                     })
 
-                    precision_5 = precision_5 + np.sum(precision_at_5)
-                    precision_10 = precision_10 + np.sum(precision_at_10)
-                    recall_5 = recall_5 + np.sum(recall_at_5)
-                    recall_10 = recall_10 + np.sum(recall_at_10)
+                    precision_5 = precision_5 + (np.sum(precision_at_5) / 5)
+                    precision_10 = precision_10 + (np.sum(precision_at_10) / 10)
+                    recall_5 = recall_5 + recall_at_5[0]
+                    recall_10 = recall_10 + recall_at_10[0]
 
             avg_precision_5 = 0
             avg_precision_10 = 0
