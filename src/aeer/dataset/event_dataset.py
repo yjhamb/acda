@@ -9,17 +9,18 @@ import sklearn.model_selection as ms
 from scipy import sparse
 from scipy.stats import bernoulli
 from sklearn.preprocessing import MultiLabelBinarizer
+import aeer.dataset.user_group_dataset as ug_dataset
 
-ny_file_name = "../../../dataset/rsvp_ny.csv"
-sfo_file_name = "../../../dataset/rsvp_sfo.csv"
-dc_file_name = "../../../dataset/rsvp_dc.csv"
-chicago_file_name = "../../../dataset/rsvp_chicago.csv"
+rsvp_ny_file = "../../../dataset/rsvp_ny.csv"
+rsvp_sfo_file = "../../../dataset/rsvp_sfo.csv"
+rsvp_dc_file = "../../../dataset/rsvp_dc.csv"
+rsvp_chicago_file = "../../../dataset/rsvp_chicago.csv"
 
 
 class EventData(object):
 
-    def __init__(self, file_name):
-        self.events = pd.read_csv(file_name)
+    def __init__(self, rsvp_file, user_group_file):
+        self.events = pd.read_csv(rsvp_file)
         # sort the event data by event time
         events_sorted = self.events.sort_values(['eventTime'], ascending=True)
         x = events_sorted.drop(['rsvpRating'], axis=1)
@@ -32,6 +33,8 @@ class EventData(object):
         self._n_events = len(self.get_events())
         self._n_groups = len(self.get_groups())
         self._n_venues = len(self.get_venues())
+        
+        self._user_group_data = ug_dataset.UserGroupData(user_group_file)
 
         # Convert the sparse event indices to a dense vector
         mlb = MultiLabelBinarizer()
@@ -94,8 +97,14 @@ class EventData(object):
         Get train user events with the group for the user with negative counts
         and corruption ratio
         """
-        groups = [self._group_class_to_index[i] for i in
-                  self.train_x[self.train_x.memberId == user_id].groupId.unique()]
+        #groups = [self._group_class_to_index[i] for i in
+        #          self.train_x[self.train_x.memberId == user_id].groupId.unique()]
+        # get groups based on the membership
+        group_list = []
+        for g in self.train_x[self.train_x.memberId == user_id].groupId.unique():
+            if self._user_group_data.is_user_in_group(user_id, g):
+                group_list.append(g)
+        groups = [self._group_class_to_index[i] for i in group_list]
         
         venues = [self._venue_class_to_index[i] for i in
                   self.train_x[self.train_x.memberId == user_id].venueId.unique()]
@@ -440,7 +449,7 @@ class EventData(object):
 def main():
     print("main method")
     print("Current Directory: ", os.getcwd())
-    event_data = EventData(chicago_file_name)
+    event_data = EventData(rsvp_chicago_file, ug_dataset.user_group_chicago_file)
     users = event_data.get_users()
     events = event_data.get_events()
     print("Users:", len(users))

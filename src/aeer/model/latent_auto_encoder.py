@@ -13,6 +13,8 @@ import numpy as np
 from sklearn.utils import shuffle
 
 from aeer.model.utils import ACTIVATION_FN
+import aeer.dataset.user_group_dataset as ug_dataset
+
 """
 Example Usage:
 
@@ -137,7 +139,7 @@ def main():
     NEG_COUNT = FLAGS.neg_count
     CORRUPT_RATIO = FLAGS.corrupt
 
-    event_data = ds.EventData(ds.chicago_file_name)
+    event_data = ds.EventData(ds.rsvp_chicago_file, ug_dataset.user_group_chicago_file)
     users = event_data.get_users()
 
     n_inputs = event_data.n_events
