@@ -97,14 +97,14 @@ class EventData(object):
         Get train user events with the group for the user with negative counts
         and corruption ratio
         """
-        #groups = [self._group_class_to_index[i] for i in
-        #          self.train_x[self.train_x.memberId == user_id].groupId.unique()]
+        groups = [self._group_class_to_index[i] for i in
+                  self.train_x[self.train_x.memberId == user_id].groupId.unique()]
         # get groups based on the membership
-        group_list = []
-        for g in self.train_x[self.train_x.memberId == user_id].groupId.unique():
-            if self._user_group_data.is_user_in_group(user_id, g):
-                group_list.append(g)
-        groups = [self._group_class_to_index[i] for i in group_list]
+        #group_list = []
+        #for g in self.train_x[self.train_x.memberId == user_id].groupId.unique():
+        #    if self._user_group_data.is_user_in_group(user_id, g):
+        #        group_list.append(g)
+        #groups = [self._group_class_to_index[i] for i in group_list]
         
         venues = [self._venue_class_to_index[i] for i in
                   self.train_x[self.train_x.memberId == user_id].venueId.unique()]
