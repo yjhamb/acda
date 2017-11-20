@@ -81,21 +81,11 @@ class EventData(object):
         unique_user_test_events = self.test_x.eventId[self.test_x.memberId == user_id].unique()
         return [self._event_class_to_index[i]
                             for i in unique_user_test_events]
+        
 
-    def get_user_test_events_with_group(self, user_id):
+    def get_user_train_groups(self, user_id):
         """
-        Get test event data with the groups for the user
-        """
-        groups = [self._group_class_to_index[i] for i in
-                  self.test_x[self.test_x.memberId == user_id].groupId.unique()]
-        # * is to unpack it and return a flat list of elements rather than a
-        # nested one
-        return (*self.get_user_events(user_id, self.test_x, self._event_class_to_index)), groups
-
-    def get_user_train_events_with_group(self, user_id, negative_count, corrupt_ratio):
-        """
-        Get train user events with the group for the user with negative counts
-        and corruption ratio
+        Get train user group indexes
         """
         groups = [self._group_class_to_index[i] for i in
                   self.train_x[self.train_x.memberId == user_id].groupId.unique()]
@@ -106,13 +96,16 @@ class EventData(object):
         #        group_list.append(g)
         #groups = [self._group_class_to_index[i] for i in group_list]
         
+        return groups
+
+    def get_user_train_venues(self, user_id):
+        """
+        Get train user venue indexes
+        """
         venues = [self._venue_class_to_index[i] for i in
                   self.train_x[self.train_x.memberId == user_id].venueId.unique()]
         
-        # * is to unpack it and return a flat list of elements rather than a
-        # nested one
-        return (*self.get_user_events(user_id, self.train_x, negative_count, 
-                                      corrupt_ratio)), groups, venues
+        return venues
 
     def get_users(self):
         return self.events.memberId.unique()

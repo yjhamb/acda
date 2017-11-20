@@ -176,8 +176,12 @@ def main():
             users = shuffle(users)
 
             for user_id in users:
-                x, y, item, group_id, venue_id = event_data.get_user_train_events_with_group(user_id, NEG_COUNT, CORRUPT_RATIO)
+                x, y, item = event_data.get_user_train_events(
+                                                    user_id, NEG_COUNT, CORRUPT_RATIO)
 
+                group_id = event_data.get_user_train_groups(user_id)
+                venue_id = event_data.get_user_train_venues(user_id)
+                
                 # We only compute loss on events we used as inputs
                 # Each row is to index the first dimension
                 gather_indices = list(zip(range(len(y)), item))
@@ -212,7 +216,9 @@ def main():
                     test_event_index = event_data.get_user_test_event_index(user_id)
                     #[event_data._event_class_to_index[i] for i in unique_user_test_events]
 
-                    x, _, _, group_id, venue_id = event_data.get_user_train_events_with_group(user_id, 0, 0)
+                    x, _, _ = event_data.get_user_train_events(user_id, 0, 0)
+                    group_id = event_data.get_user_train_groups(user_id)
+                    venue_id = event_data.get_user_train_venues(user_id)
 
                     # We replicate X, for the number of test events
                     x = np.tile(x.toarray().astype(np.float32), (len(test_event_index), 1))
