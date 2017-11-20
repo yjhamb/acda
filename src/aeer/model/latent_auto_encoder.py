@@ -46,9 +46,6 @@ parser.add_argument('--output_fn',
                     help='output activation function to use',
                     default='sigmoid', type=str, choices=activation_fn_names)
 
-FLAGS = parser.parse_args()
-
-os.environ['CUDA_VISIBLE_DEVICES'] = FLAGS.gpu
 
 class LatentFactorAutoEncoder(object):
 
@@ -181,7 +178,7 @@ def main():
 
                 group_id = event_data.get_user_train_groups(user_id)
                 venue_id = event_data.get_user_train_venues(user_id)
-                
+
                 # We only compute loss on events we used as inputs
                 # Each row is to index the first dimension
                 gather_indices = list(zip(range(len(y)), item))
@@ -233,7 +230,6 @@ def main():
                         model.group_id: group_id,
                         model.venue_id: venue_id,
                     })
-
                     precision_5 = precision_5 + (np.sum(precision_at_5) / 5)
                     precision_10 = precision_10 + (np.sum(precision_at_10) / 10)
                     recall_5 = recall_5 + recall_at_5[0]
@@ -255,4 +251,6 @@ def main():
             print()
 
 if __name__ == '__main__':
+    FLAGS = parser.parse_args()
+    os.environ['CUDA_VISIBLE_DEVICES'] = FLAGS.gpu
     main()
