@@ -199,10 +199,10 @@ def main():
 
             # evaluate the model on the test set
             test_users = event_data.get_test_users()
-            precision_5 = 0
-            precision_10 = 0
-            recall_5 = 0
-            recall_10 = 0
+            precision = []
+            recall = []
+            eval_at = [5, 10]
+
             valid_test_users = 0
             for user_id in test_users:
                 # check if user was present in training data
@@ -217,42 +217,38 @@ def main():
                     group_id = event_data.get_user_train_groups(user_id)
                     venue_id = event_data.get_user_train_venues(user_id)
 
-                    # We replicate X, for the number of test events
-                    x = np.tile(x.toarray().astype(np.float32), (len(test_event_index), 1))
-                    
-                    # evaluate the model using the actuals - update the metrics
-                    sess.run([model.r5_update, model.r10_update], {
-                        model.x: x,
-                        model.actuals: test_event_index,
+                    # Compute score
+                    score = sess.run(model.outputs, {
+                        model.x: x.toarray().astype(np.float32),
                         model.group_id: group_id,
                         model.venue_id: venue_id,
-                    })
+                    })[0] # We only do one sample at a time, take 0 index
 
-                    # evaluate the model using the actuals
-                    p5_score, p10_score, r5_score, r10_score = sess.run([model.p5_score,
-                                                                         model.p10_score,
-                                                                         model.r5_score,
-                                                                         model.r10_score], {
-                        model.x: x,
-                        model.actuals: test_event_index,
-                        model.group_id: group_id,
-                        model.venue_id: venue_id,
-                    })
-                    
-                    precision_5 = precision_5 + (np.sum(p5_score) / 5)
-                    precision_10 = precision_10 + (np.sum(p10_score) / 10)
-                    recall_5 = recall_5 + r5_score
-                    recall_10 = recall_10 + r10_score
+                    # Sorted in ascending order, we then take the last values
+                    index = np.argsort(score)
 
-            avg_precision_5 = 0
-            avg_precision_10 = 0
-            avg_recall_5 = 0
-            avg_recall_10 = 0
+                    # Number of test instances
+                    N = len(test_event_index)
+                    p = []
+                    r = []
+
+                    for k in eval_at:
+                        # Correct ones
+                        hits = len(set(index[-k:]).intersection(set(test_event_index)))
+                        # recall: Over all possible
+                        r.append(hits / N)
+                        # Precision: Over Top-K or possible amount
+                        p.append(hits / min(N, k))
+                    precision.append(p)
+                    recall.append(r)
+
             if valid_test_users > 0:
-                avg_precision_5 = precision_5 / valid_test_users
-                avg_precision_10 = precision_10 / valid_test_users
-                avg_recall_5 = recall_5 / valid_test_users
-                avg_recall_10 = recall_10 / valid_test_users
+                # Unpack the lists zip(*[[1,2], [3, 4]]) => [1,3], [2,4]
+                avg_precision_5, avg_precision_10 = zip(*precision)
+                avg_precision_5, avg_precision_10 = np.mean(avg_precision_5), np.mean(avg_precision_10)
+
+                avg_recall_5, avg_recall_10 = zip(*recall)
+                avg_recall_5, avg_recall_10 = np.mean(avg_recall_5), np.mean(avg_recall_10)
 
             # Directly access variables
             print(f"Precision@5: {avg_precision_5:>10.6f}       Precision@10: {avg_precision_10:>10.6f}")
