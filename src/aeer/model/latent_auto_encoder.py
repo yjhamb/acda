@@ -117,10 +117,10 @@ class LatentFactorAutoEncoder(object):
         self.actuals = tf.placeholder(tf.int64, shape=[None])
 
         # evaluate metrics outputs and actuals
-        self.precision_at_5 = tf.nn.in_top_k(self.outputs, self.actuals, k=5)
-        self.precision_at_10 = tf.nn.in_top_k(self.outputs, self.actuals, k=10)
-        self.recall_at_5 = tf.metrics.recall_at_k(self.actuals, self.outputs, k=5)
-        self.recall_at_10 = tf.metrics.recall_at_k(self.actuals, self.outputs, k=10)
+        self.p5_score = tf.nn.in_top_k(self.outputs, self.actuals, k=5)
+        self.p10_score = tf.nn.in_top_k(self.outputs, self.actuals, k=10)
+        self.r5_score, self.r5_update = tf.metrics.recall_at_k(self.actuals, self.outputs, k=5)
+        self.r10_score, self.r10_update = tf.metrics.recall_at_k(self.actuals, self.outputs, k=10)
 
         # square loss
         #self.loss = tf.losses.mean_squared_error(self.targets, self.y) + self.reg_scale * self.weights_regularizer
@@ -219,21 +219,30 @@ def main():
 
                     # We replicate X, for the number of test events
                     x = np.tile(x.toarray().astype(np.float32), (len(test_event_index), 1))
-
-                    # evaluate the model using the actuals
-                    precision_at_5, precision_at_10, recall_at_5, recall_at_10 = sess.run([model.precision_at_5,
-                                                                                           model.precision_at_10,
-                                                                                           model.recall_at_5,
-                                                                                           model.recall_at_10], {
+                    
+                    # evaluate the model using the actuals - update the metrics
+                    sess.run([model.r5_update, model.r10_update], {
                         model.x: x,
                         model.actuals: test_event_index,
                         model.group_id: group_id,
                         model.venue_id: venue_id,
                     })
-                    precision_5 = precision_5 + (np.sum(precision_at_5) / 5)
-                    precision_10 = precision_10 + (np.sum(precision_at_10) / 10)
-                    recall_5 = recall_5 + recall_at_5[0]
-                    recall_10 = recall_10 + recall_at_10[0]
+
+                    # evaluate the model using the actuals
+                    p5_score, p10_score, r5_score, r10_score = sess.run([model.p5_score,
+                                                                         model.p10_score,
+                                                                         model.r5_score,
+                                                                         model.r10_score], {
+                        model.x: x,
+                        model.actuals: test_event_index,
+                        model.group_id: group_id,
+                        model.venue_id: venue_id,
+                    })
+                    
+                    precision_5 = precision_5 + (np.sum(p5_score) / 5)
+                    precision_10 = precision_10 + (np.sum(p10_score) / 10)
+                    recall_5 = recall_5 + r5_score
+                    recall_10 = recall_10 + r10_score
 
             avg_precision_5 = 0
             avg_precision_10 = 0
