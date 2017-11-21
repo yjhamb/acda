@@ -129,6 +129,25 @@ class LatentFactorAutoEncoder(object):
         # Train Model
         self.train = optimizer.minimize(self.loss)
 
+def compute_metrics_at_k(predictions, actuals, k):
+    """
+    Computes the precision, recall, MAP and NDCG at k
+    :param predictions: array, predicted values
+    :param actuals: array, actual values
+    :param k: int, value to compute the metric at
+    :returns precision: float, the precision score at k
+    :returns recall: float, the recall score at k
+    """
+    N = len(actuals)
+    true_pos = len(set(predictions[-k:]).intersection(set(actuals)))
+    false_pos = min(N, k) - true_pos
+    false_neg = N - true_pos
+    # recall: Over all possible
+    recall = true_pos / (true_pos + false_neg)
+    # Precision: Over Top-K or possible amount
+    precision = true_pos / (true_pos + false_pos)
+    return precision, recall
+
 
 def main():
     n_epochs = FLAGS.epochs
@@ -228,17 +247,15 @@ def main():
                     index = np.argsort(score)
 
                     # Number of test instances
-                    N = len(test_event_index)
                     p = []
                     r = []
-
                     for k in eval_at:
+                        prec, rec = compute_metrics_at_k(index, test_event_index, k)
                         # Correct ones
-                        hits = len(set(index[-k:]).intersection(set(test_event_index)))
                         # recall: Over all possible
-                        r.append(hits / N)
+                        r.append(rec)
                         # Precision: Over Top-K or possible amount
-                        p.append(hits / min(N, k))
+                        p.append(prec)
                     precision.append(p)
                     recall.append(r)
 
