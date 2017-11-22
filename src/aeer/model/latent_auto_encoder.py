@@ -137,9 +137,9 @@ def precision_at_k(predictions, actuals, k):
     :param k: int, value to compute the metric at
     :returns precision: float, the precision score at k
     """
-    #N = len(actuals)
+    N = len(actuals)
     hits = len(set(predictions[-k:]).intersection(set(actuals)))
-    precision = hits / k
+    precision = hits / min(N, k)
     return precision
 
 def recall_at_k(predictions, actuals, k):
