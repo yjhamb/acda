@@ -164,7 +164,7 @@ def map_at_k(predictions, actuals, k):
     :returns MAP: float, the score at k
     """
     avg_prec = []
-    for i in range(k):
+    for i in range(1, k+1):
         prec = precision_at_k(predictions, actuals, i)
         avg_prec.append(prec)
     return np.mean(avg_prec)
@@ -177,11 +177,18 @@ def ndcg_at_k(predictions, actuals, k):
     :param k: int, value to compute the metric at
     :returns NDCG: float, the score at k
     """
-    N = len(actuals)
-    true_pos = len(set(predictions[-k:]).intersection(set(actuals)))
-    false_pos = min(N, k) - true_pos
-    precision = true_pos / (true_pos + false_pos)
-    return precision
+    cum_gain = 0
+    ideal_gain = 1
+    topk = predictions[-k:]
+    if topk[0] in actuals:
+        cum_gain = 1
+    # calculate the ideal gain at k
+    for i in range(2, k):
+        ideal_gain += 1 / np.log2(i)
+        if topk[i] in actuals:
+            cum_gain += 1 / np.log2(i)
+    
+    return cum_gain / ideal_gain
 
 def main():
     n_epochs = FLAGS.epochs
@@ -254,6 +261,8 @@ def main():
             test_users = event_data.get_test_users()
             precision = []
             recall = []
+            mean_avg_prec = []
+            ndcg = []
             eval_at = [5, 10]
 
             valid_test_users = 0
@@ -281,16 +290,20 @@ def main():
                     index = np.argsort(score)
 
                     # Number of test instances
-                    p = []
-                    r = []
+                    preck = []
+                    recallk = []
+                    mapk = []
+                    ndcgk = []
                     for k in eval_at:
-                        prec = precision_at_k(index, test_event_index, k)
-                        rec = recall_at_k(index, test_event_index, k)
-                        r.append(rec)
-                        p.append(prec)
+                        preck.append(precision_at_k(index, test_event_index, k))
+                        recallk.append(recall_at_k(index, test_event_index, k))
+                        mapk.append(map_at_k(index, test_event_index, k))
+                        ndcgk.append(ndcg_at_k(index, test_event_index, k))
                         
-                    precision.append(p)
-                    recall.append(r)
+                    precision.append(preck)
+                    recall.append(recallk)
+                    mean_avg_prec.append(mapk)
+                    ndcg.append(ndcgk)
 
             if valid_test_users > 0:
                 # Unpack the lists zip(*[[1,2], [3, 4]]) => [1,3], [2,4]
@@ -299,10 +312,18 @@ def main():
 
                 avg_recall_5, avg_recall_10 = zip(*recall)
                 avg_recall_5, avg_recall_10 = np.mean(avg_recall_5), np.mean(avg_recall_10)
+                
+                avg_map_5, avg_map_10 = zip(*mean_avg_prec)
+                avg_map_5, avg_map_10 = np.mean(avg_map_5), np.mean(avg_map_10)
+                
+                avg_ndcg_5, avg_ndcg_10 = zip(*ndcg)
+                avg_ndcg_5, avg_ndcg_10 = np.mean(avg_ndcg_5), np.mean(avg_ndcg_10)
 
             # Directly access variables
             print(f"Precision@5: {avg_precision_5:>10.6f}       Precision@10: {avg_precision_10:>10.6f}")
             print(f"Recall@5:    {avg_recall_5:>10.6f}       Recall@10:    {avg_recall_10:>10.6f}")
+            print(f"MAP@5:    {avg_map_5:>10.6f}       MAP@10:    {avg_map_10:>10.6f}")
+            print(f"NDCG@5:    {avg_ndcg_5:>10.6f}       NDCG@10:    {avg_ndcg_10:>10.6f}")
             print()
 
 if __name__ == '__main__':
