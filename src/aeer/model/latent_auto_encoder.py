@@ -137,10 +137,9 @@ def precision_at_k(predictions, actuals, k):
     :param k: int, value to compute the metric at
     :returns precision: float, the precision score at k
     """
-    N = len(actuals)
-    true_pos = len(set(predictions[-k:]).intersection(set(actuals)))
-    false_pos = min(N, k) - true_pos
-    precision = true_pos / (true_pos + false_pos)
+    #N = len(actuals)
+    hits = len(set(predictions[-k:]).intersection(set(actuals)))
+    precision = hits / k
     return precision
 
 def recall_at_k(predictions, actuals, k):
@@ -152,9 +151,8 @@ def recall_at_k(predictions, actuals, k):
     :returns recall: float, the recall score at k
     """
     N = len(actuals)
-    true_pos = len(set(predictions[-k:]).intersection(set(actuals)))
-    false_neg = N - true_pos
-    recall = true_pos / (true_pos + false_neg)
+    hits = len(set(predictions[-k:]).intersection(set(actuals)))
+    recall = hits / N
     return recall
 
 def map_at_k(predictions, actuals, k):
