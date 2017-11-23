@@ -117,10 +117,10 @@ class LatentFactorAutoEncoder(object):
         self.actuals = tf.placeholder(tf.int64, shape=[None])
 
         # evaluate metrics outputs and actuals
-        self.p5_score = tf.nn.in_top_k(self.outputs, self.actuals, k=5)
-        self.p10_score = tf.nn.in_top_k(self.outputs, self.actuals, k=10)
-        self.r5_score, self.r5_update = tf.metrics.recall_at_k(self.actuals, self.outputs, k=5)
-        self.r10_score, self.r10_update = tf.metrics.recall_at_k(self.actuals, self.outputs, k=10)
+        #self.p5_score = tf.nn.in_top_k(self.outputs, self.actuals, k=5)
+        #self.p10_score = tf.nn.in_top_k(self.outputs, self.actuals, k=10)
+        #self.r5_score, self.r5_update = tf.metrics.recall_at_k(self.actuals, self.outputs, k=5)
+        #self.r10_score, self.r10_update = tf.metrics.recall_at_k(self.actuals, self.outputs, k=10)
 
         # square loss
         #self.loss = tf.losses.mean_squared_error(self.targets, self.y) + self.reg_scale * self.weights_regularizer
@@ -197,7 +197,7 @@ def main():
     CORRUPT_RATIO = FLAGS.corrupt
 
     event_data = ds.EventData(ds.rsvp_chicago_file, ug_dataset.user_group_chicago_file)
-    users = event_data.get_users()
+    users = event_data.get_train_users()
 
     n_inputs = event_data.n_events
     n_groups = event_data.n_groups

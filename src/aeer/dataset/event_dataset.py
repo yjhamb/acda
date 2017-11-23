@@ -179,6 +179,7 @@ class EventData(object):
 
         # Sample negative items
         if negative_count > 0:
+            negative_count = len(positives)
             negatives = [self.sample_negative(positives, event_count) for _ in range(negative_count)]
         else:
             negatives = []
