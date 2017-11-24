@@ -29,6 +29,9 @@ class EventData(object):
         # perform the train-test split
         self.train_x, self.test_x, self.train_y, self.test_y = ms.train_test_split(x, y, test_size=0.2, random_state=42)
         
+        # split again to generate CV set
+        self.train_x, self.cv_x, self.train_y, self.cv_y = ms.train_test_split(self.train_x, self.train_y, test_size=0.2, random_state=42)
+        
         self._n_users = len(self.get_users())
         self._n_events = len(self.get_events())
         self._n_groups = len(self.get_groups())
@@ -82,6 +85,13 @@ class EventData(object):
         return [self._event_class_to_index[i]
                             for i in unique_user_test_events]
         
+    def get_user_cv_event_index(self, user_id):
+        """
+        Get the converted index of user events
+        """
+        unique_user_cv_events = self.cv_x.eventId[self.cv_x.memberId == user_id].unique()
+        return [self._event_class_to_index[i]
+                            for i in unique_user_cv_events]
 
     def get_user_train_groups(self, user_id):
         """
@@ -130,6 +140,8 @@ class EventData(object):
     def get_test_users(self):
         return self.test_x.memberId.unique()
 
+    def get_cv_users(self):
+        return self.cv_x.memberId.unique()
 
     def get_train_events(self):
         return self.train_x.eventId.unique()

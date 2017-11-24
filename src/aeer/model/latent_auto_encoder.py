@@ -258,7 +258,7 @@ def main():
                                                             epoch_loss))
 
             # evaluate the model on the test set
-            test_users = event_data.get_test_users()
+            cv_users = event_data.get_cv_users()
             precision = []
             recall = []
             mean_avg_prec = []
@@ -266,14 +266,12 @@ def main():
             eval_at = [5, 10]
 
             valid_test_users = 0
-            for user_id in test_users:
+            for user_id in cv_users:
                 # check if user was present in training data
                 train_users = event_data.get_train_users()
                 if user_id in train_users:
                     valid_test_users = valid_test_users + 1
-                    #unique_user_test_events = event_data.get_user_unique_test_events(user_id)
-                    test_event_index = event_data.get_user_test_event_index(user_id)
-                    #[event_data._event_class_to_index[i] for i in unique_user_test_events]
+                    test_event_index = event_data.get_user_cv_event_index(user_id)
 
                     x, _, _ = event_data.get_user_train_events(user_id, 0, 0)
                     group_id = event_data.get_user_train_groups(user_id)
