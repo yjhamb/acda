@@ -74,7 +74,7 @@ def main():
     NEG_COUNT = 4
     CORRUPT_RATIO = 0.1
     
-    event_data = ds.EventData(ds.chicago_file_name)
+    event_data = ds.EventData(ds.rsvp_chicago_file)
     users = event_data.get_users()
     events = event_data.get_events()
     venues = event_data.get_venues()

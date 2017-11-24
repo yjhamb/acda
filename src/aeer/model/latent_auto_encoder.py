@@ -87,7 +87,7 @@ class LatentFactorAutoEncoder(object):
                                          initializer=tf.random_uniform_initializer(-eps, eps))
             self.venue_factor = tf.nn.embedding_lookup(venue_bias, self.venue_id,
                                                        name='VenueLookup')
-            # Sum all group factors, then make it a vector so it will broadcast
+            # Sum all venue factors, then make it a vector so it will broadcast
             # and add it to all instances
             venue_factor = tf.squeeze(tf.reduce_sum(self.venue_factor, axis=0))
             preactivation += venue_factor
@@ -115,12 +115,6 @@ class LatentFactorAutoEncoder(object):
         self.targets = tf.gather_nd(self.outputs, self.gather_indices)
 
         self.actuals = tf.placeholder(tf.int64, shape=[None])
-
-        # evaluate metrics outputs and actuals
-        #self.p5_score = tf.nn.in_top_k(self.outputs, self.actuals, k=5)
-        #self.p10_score = tf.nn.in_top_k(self.outputs, self.actuals, k=10)
-        #self.r5_score, self.r5_update = tf.metrics.recall_at_k(self.actuals, self.outputs, k=5)
-        #self.r10_score, self.r10_update = tf.metrics.recall_at_k(self.actuals, self.outputs, k=10)
 
         # square loss
         #self.loss = tf.losses.mean_squared_error(self.targets, self.y) + self.reg_scale * self.weights_regularizer
@@ -233,11 +227,11 @@ def main():
             users = shuffle(users)
 
             for user_id in users:
-                x, y, item = event_data.get_user_train_events(
+                x, y, item, venue_id, group_id = event_data.get_user_train_events_with_context(
                                                     user_id, NEG_COUNT, CORRUPT_RATIO)
 
-                group_id = event_data.get_user_train_groups(user_id)
-                venue_id = event_data.get_user_train_venues(user_id)
+                #group_id = event_data.get_user_train_groups(user_id)
+                #venue_id = event_data.get_user_train_venues(user_id)
 
                 # We only compute loss on events we used as inputs
                 # Each row is to index the first dimension
@@ -273,9 +267,9 @@ def main():
                     valid_test_users = valid_test_users + 1
                     test_event_index = event_data.get_user_cv_event_index(user_id)
 
-                    x, _, _ = event_data.get_user_train_events(user_id, 0, 0)
-                    group_id = event_data.get_user_train_groups(user_id)
-                    venue_id = event_data.get_user_train_venues(user_id)
+                    x, _, _, venue_id, group_id = event_data.get_user_train_events_with_context(user_id, 0, 0)
+                    #group_id = event_data.get_user_train_groups(user_id)
+                    #venue_id = event_data.get_user_train_venues(user_id)
 
                     # Compute score
                     score = sess.run(model.outputs, {
