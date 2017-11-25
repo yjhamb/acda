@@ -227,11 +227,11 @@ def main():
             users = shuffle(users)
 
             for user_id in users:
-                x, y, item, venue_id, group_id = event_data.get_user_train_events_with_context(
+                x, y, item = event_data.get_user_train_events(
                                                     user_id, NEG_COUNT, CORRUPT_RATIO)
 
-                #group_id = event_data.get_user_train_groups(user_id)
-                #venue_id = event_data.get_user_train_venues(user_id)
+                group_ids = event_data.get_user_train_groups(user_id)
+                venue_ids = event_data.get_user_train_venues(user_id)
 
                 # We only compute loss on events we used as inputs
                 # Each row is to index the first dimension
@@ -241,8 +241,8 @@ def main():
                 batch_loss, _ = sess.run([model.loss, model.train], {
                     model.x: x.toarray().astype(np.float32),
                     model.gather_indices: gather_indices,
-                    model.group_id: group_id,
-                    model.venue_id: venue_id,
+                    model.group_id: group_ids,
+                    model.venue_id: venue_ids,
                     model.y: y
                 })
 
@@ -267,15 +267,15 @@ def main():
                     valid_test_users = valid_test_users + 1
                     test_event_index = event_data.get_user_cv_event_index(user_id)
 
-                    x, _, _, venue_id, group_id = event_data.get_user_train_events_with_context(user_id, 0, 0)
-                    #group_id = event_data.get_user_train_groups(user_id)
-                    #venue_id = event_data.get_user_train_venues(user_id)
+                    x, _, _ = event_data.get_user_train_events(user_id, 0, 0)
+                    group_ids = event_data.get_user_train_groups(user_id)
+                    venue_ids = event_data.get_user_train_venues(user_id)
 
                     # Compute score
                     score = sess.run(model.outputs, {
                         model.x: x.toarray().astype(np.float32),
-                        model.group_id: group_id,
-                        model.venue_id: venue_id,
+                        model.group_id: group_ids,
+                        model.venue_id: venue_ids,
                     })[0] # We only do one sample at a time, take 0 index
 
                     # Sorted in ascending order, we then take the last values
