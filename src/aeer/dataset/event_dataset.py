@@ -306,13 +306,15 @@ class EventData(object):
             
         venues = [self._venue_class_to_index[i] for i in
                   df[df.memberId == user_id].venueId.unique()]
-        if negative_count > 0:
-            venues.extend([self._venue_class_to_index[i] for i in negative_samples.venueId.unique()])
+        #if negative_count > 0:
+        #    venues.extend([self._venue_class_to_index[i] for i in negative_samples.venueId.unique()])
         
-        groups = [self._group_class_to_index[i] for i in
-                  df[df.memberId == user_id].groupId.unique()]
-        if negative_count > 0:
-            groups.extend([self._group_class_to_index[i] for i in negative_samples.groupId.unique()])
+        groups = [] 
+        for g in df[df.memberId == user_id].groupId.unique():
+            if self._user_group_data.is_user_in_group(user_id, g):
+                groups.append(self._group_class_to_index[g])
+        #if negative_count > 0:
+        #    groups.extend([self._group_class_to_index[i] for i in negative_samples.groupId.unique()])
 
         return x, y_targets, cols, venues, groups
 
