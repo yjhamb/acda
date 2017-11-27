@@ -99,17 +99,18 @@ class LatentFactorAutoEncoder(object):
             self.group_factor = tf.nn.embedding_lookup(group_bias, self.group_id,
                                                        name='GroupLookup')
             group_factor = tf.squeeze(tf.reduce_sum(self.group_factor, axis=0))
-            preactivation += group_factor
+            #preactivation += group_factor
 
         hidden = ACTIVATION_FN[hidden_activation](preactivation)
+        attention = tf.multiply(tf.nn.softmax(tf.tanh(hidden + group_factor)), hidden)
 
         # add weight regularizer
         # self.reg_scale = 0.01
         # self.weights_regularizer = tf.nn.l2_loss(W, "weight_loss")
         #self.reg_loss = tf.reduce_sum(tf.abs(W))
 
-        # create the output layer with no activation function
-        self.outputs = fully_connected(hidden, n_outputs,
+        # create the output layer
+        self.outputs = fully_connected(attention, n_outputs,
                                        activation_fn=ACTIVATION_FN[output_activation])
 
         self.targets = tf.gather_nd(self.outputs, self.gather_indices)
