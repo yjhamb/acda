@@ -26,9 +26,9 @@ python latent_auto_encoder.py --nogroup
 """
 parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument('-g', '--gpu', help='set gpu device number 0-3', type=str, default='3')
-parser.add_argument('-e', '--epochs', help='Number of epochs', type=int, default=5)
+parser.add_argument('-e', '--epochs', help='Number of epochs', type=int, default=100)
 parser.add_argument('-s', '--size', help='Number of hidden layer',
-                    type=int, default=50)
+                    type=int, default=100)
 parser.add_argument('-n', '--neg_count', help='Number of negatives', type=int,
                     default=4)
 parser.add_argument('-c', '--corrupt', help='Corruption ratio', type=float,
@@ -98,19 +98,26 @@ class LatentFactorAutoEncoder(object):
                                          initializer=tf.random_uniform_initializer(-eps, eps))
             self.group_factor = tf.nn.embedding_lookup(group_bias, self.group_id,
                                                        name='GroupLookup')
-            group_factor = tf.squeeze(tf.reduce_sum(self.group_factor, axis=0))
-            #preactivation += group_factor
+            attn_weight = tf.get_variable('AttentionWLogits',
+                                                      shape=[n_hidden, 1])
+            # Multiply Group Factors by a weight vector
+            # We could make this a deeper network...
+            attention = tf.nn.softmax(tf.matmul(self.group_factor, attn_weight))
+
+            # Weighted sum of group factors
+            group_weighted = tf.reduce_sum(attention * self.group_factor,
+                                      axis=0)
+            # Add to
+            preactivation += tf.squeeze(group_weighted)
 
         hidden = ACTIVATION_FN[hidden_activation](preactivation)
-        attention = tf.multiply(tf.nn.softmax(tf.tanh(hidden + group_factor)), hidden)
-
         # add weight regularizer
         # self.reg_scale = 0.01
         # self.weights_regularizer = tf.nn.l2_loss(W, "weight_loss")
         #self.reg_loss = tf.reduce_sum(tf.abs(W))
 
         # create the output layer
-        self.outputs = fully_connected(attention, n_outputs,
+        self.outputs = fully_connected(hidden, n_outputs,
                                        activation_fn=ACTIVATION_FN[output_activation])
 
         self.targets = tf.gather_nd(self.outputs, self.gather_indices)
@@ -182,7 +189,7 @@ def ndcg_at_k(predictions, actuals, k):
         ideal_gain += 1 / np.log2(i)
         if topk[i] in actuals:
             cum_gain += 1 / np.log2(i)
-    
+
     return cum_gain / ideal_gain
 
 def main():
@@ -248,9 +255,8 @@ def main():
                 })
 
                 epoch_loss += batch_loss
-
-            print("Epoch {:,}/{:<10,} Loss: {:,.6f}".format(epoch, n_epochs,
-                                                            epoch_loss))
+            print("Epoch: {:>16}       Loss: {:>10,.6f}".format("%s/%s" % (epoch, n_epochs),
+                                                                epoch_loss))
 
             # evaluate the model on the test set
             cv_users = event_data.get_cv_users()
@@ -292,7 +298,7 @@ def main():
                         recallk.append(recall_at_k(index, test_event_index, k))
                         mapk.append(map_at_k(index, test_event_index, k))
                         ndcgk.append(ndcg_at_k(index, test_event_index, k))
-                        
+
                     precision.append(preck)
                     recall.append(recallk)
                     mean_avg_prec.append(mapk)
@@ -305,18 +311,18 @@ def main():
 
                 avg_recall_5, avg_recall_10 = zip(*recall)
                 avg_recall_5, avg_recall_10 = np.mean(avg_recall_5), np.mean(avg_recall_10)
-                
+
                 avg_map_5, avg_map_10 = zip(*mean_avg_prec)
                 avg_map_5, avg_map_10 = np.mean(avg_map_5), np.mean(avg_map_10)
-                
+
                 avg_ndcg_5, avg_ndcg_10 = zip(*ndcg)
                 avg_ndcg_5, avg_ndcg_10 = np.mean(avg_ndcg_5), np.mean(avg_ndcg_10)
 
             # Directly access variables
             print(f"Precision@5: {avg_precision_5:>10.6f}       Precision@10: {avg_precision_10:>10.6f}")
             print(f"Recall@5:    {avg_recall_5:>10.6f}       Recall@10:    {avg_recall_10:>10.6f}")
-            print(f"MAP@5:    {avg_map_5:>10.6f}       MAP@10:    {avg_map_10:>10.6f}")
-            print(f"NDCG@5:    {avg_ndcg_5:>10.6f}       NDCG@10:    {avg_ndcg_10:>10.6f}")
+            print(f"MAP@5:       {avg_map_5:>10.6f}       MAP@10:       {avg_map_10:>10.6f}")
+            print(f"NDCG@5:      {avg_ndcg_5:>10.6f}       NDCG@10:      {avg_ndcg_10:>10.6f}")
             print()
 
 if __name__ == '__main__':
