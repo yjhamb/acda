@@ -2,5 +2,7 @@
 .project
 .pydevproject
 
+papers/
+
 __pycache__
 .DS_Store
