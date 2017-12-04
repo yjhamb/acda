@@ -159,14 +159,14 @@ class EventData(object):
         """
         Calls the get_user_events method with the training data
         """
-        return self.get_user_events_pairwise(user_id, self.train_x, negative_count, corrupt_ratio)
+        return self.get_user_events(user_id, self.train_x, negative_count, corrupt_ratio)
 
 
     def get_user_test_events(self, user_id):
         """
         Calls the get_user_events method with the test data
         """
-        return self.get_user_events_pairwise(user_id, self.test_x)
+        return self.get_user_events(user_id, self.test_x)
 
 
     def get_user_events(self, user_id, df, negative_count=0, corrupt_ratio=0):
@@ -269,19 +269,15 @@ class EventData(object):
         
         if negative_count > 0:
             input_count = len(positives) * 2
-            x_data.extend([1.0] * input_count)
-            x = sparse.coo_matrix((x_data,
+        else:
+            input_count = len(positives)
+        
+        x_data.extend([1.0] * input_count)
+        x = sparse.coo_matrix((x_data,
                                (rows, cols)),
                               shape=(input_count, event_count),
                               dtype=np.float32)
-        else:
-            input_count = len(positives)
-            x_data.extend([1.0] * input_count)
-            x = sparse.coo_matrix((x_data,
-                           (rows, cols)),
-                          shape=(input_count, event_count),
-                          dtype=np.float32)
-    
+            
         # Negative targets are 0, positives are 1
         y_targets = np.zeros(input_count, dtype=np.float32)
         y_targets[:len(positives)] = 1.0

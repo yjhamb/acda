@@ -26,7 +26,7 @@ python latent_auto_encoder.py --nogroup
 """
 parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument('-g', '--gpu', help='set gpu device number 0-3', type=str, default='3')
-parser.add_argument('-e', '--epochs', help='Number of epochs', type=int, default=100)
+parser.add_argument('-e', '--epochs', help='Number of epochs', type=int, default=5)
 parser.add_argument('-s', '--size', help='Number of hidden layer',
                     type=int, default=100)
 parser.add_argument('-n', '--neg_count', help='Number of negatives', type=int,
@@ -126,7 +126,8 @@ class LatentFactorAutoEncoder(object):
 
         # square loss
         #self.loss = tf.losses.mean_squared_error(self.targets, self.y) + self.reg_scale * self.weights_regularizer
-        self.loss = tf.losses.mean_squared_error(self.targets, self.y)
+        #self.loss = tf.losses.mean_squared_error(self.targets, self.y)
+        self.loss = tf.losses.log_loss(self.targets, self.y)
         optimizer = tf.train.AdamOptimizer(learning_rate)
         # Train Model
         self.train = optimizer.minimize(self.loss)
@@ -179,13 +180,14 @@ def ndcg_at_k(predictions, actuals, k):
     :param k: int, value to compute the metric at
     :returns NDCG: float, the score at k
     """
+    N = min(len(actuals), k)
     cum_gain = 0
     ideal_gain = 1
     topk = predictions[-k:]
     if topk[0] in actuals:
         cum_gain = 1
     # calculate the ideal gain at k
-    for i in range(2, k):
+    for i in range(2, N):
         ideal_gain += 1 / np.log2(i)
         if topk[i] in actuals:
             cum_gain += 1 / np.log2(i)
