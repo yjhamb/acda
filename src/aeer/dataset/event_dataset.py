@@ -159,14 +159,14 @@ class EventData(object):
         """
         Calls the get_user_events method with the training data
         """
-        return self.get_user_events(user_id, self.train_x, negative_count, corrupt_ratio)
+        return self.get_user_events_pairwise(user_id, self.train_x, negative_count, corrupt_ratio)
 
 
     def get_user_test_events(self, user_id):
         """
         Calls the get_user_events method with the test data
         """
-        return self.get_user_events(user_id, self.test_x)
+        return self.get_user_events_pairwise(user_id, self.test_x)
 
 
     def get_user_events(self, user_id, df, negative_count=0, corrupt_ratio=0):
@@ -219,6 +219,69 @@ class EventData(object):
                               shape=(1, event_count),
                               dtype=np.float32)
 
+        # Negative targets are 0, positives are 1
+        y_targets = np.zeros(input_count, dtype=np.float32)
+        y_targets[:len(positives)] = 1.0
+
+        # Sparse Matrix; directly take the data and corrupt it
+        if corrupt_ratio > 0:
+            x.data = self.corrupt_input(x.data, corrupt_ratio).astype(np.float32)
+
+        return x, y_targets, cols
+    
+    
+    def get_user_events_pairwise(self, user_id, df, negative_count=0, corrupt_ratio=0):
+        """
+        This will get a single users events (training or test based on input parameter).
+        We encode each user with a k-hot encoding, where a 1 if they have rated the item.
+        We then sample negative items they have not observed, if neg_ratio > 0.
+        Negative items have a target of 0 and positives 1.
+        We finally corrupt all the encoded user vectors, if the corrupt_ratio > 0.
+
+        :param user_id: user id in dataframe
+        :param df: the dataframe for training or test
+        :param negative_count: int, ratio of negative samples
+        :param corrupt_ratio: float, [0, 1] the probability of corrupting samples
+        :returns: Encoded User Vector, Y Target, item ids
+        """
+
+        event_count = self.n_events
+
+        # Get all positive items
+        positives = [self._event_class_to_index[i] for i in df.eventId[df.memberId == user_id].unique()]
+        cols = []
+        rows = []
+        x_data = []
+        counter = 0
+        for p in positives:
+            positive = [p]
+            # Sample negative items
+            if negative_count > 0:
+                negative_samples = self.sample_negative_on_context(df, user_id, 1)
+                negative = [self._event_class_to_index[i] for i in negative_samples.eventId.unique()]
+            else:
+                negative = []
+    
+            # Indices for the items
+            cols.extend(positive + negative)
+            rows.extend([counter] * (len(positive) + len(negative)))
+            counter += 1
+        
+        if negative_count > 0:
+            input_count = len(positives) * 2
+            x_data.extend([1.0] * input_count)
+            x = sparse.coo_matrix((x_data,
+                               (rows, cols)),
+                              shape=(input_count, event_count),
+                              dtype=np.float32)
+        else:
+            input_count = len(positives)
+            x_data.extend([1.0] * input_count)
+            x = sparse.coo_matrix((x_data,
+                           (rows, cols)),
+                          shape=(input_count, event_count),
+                          dtype=np.float32)
+    
         # Negative targets are 0, positives are 1
         y_targets = np.zeros(input_count, dtype=np.float32)
         y_targets[:len(positives)] = 1.0
