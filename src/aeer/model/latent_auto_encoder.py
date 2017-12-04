@@ -126,8 +126,8 @@ class LatentFactorAutoEncoder(object):
 
         # square loss
         #self.loss = tf.losses.mean_squared_error(self.targets, self.y) + self.reg_scale * self.weights_regularizer
-        #self.loss = tf.losses.mean_squared_error(self.targets, self.y)
-        self.loss = tf.losses.log_loss(self.targets, self.y)
+        self.loss = tf.losses.mean_squared_error(self.targets, self.y)
+        #self.loss = tf.losses.log_loss(self.targets, self.y)
         optimizer = tf.train.AdamOptimizer(learning_rate)
         # Train Model
         self.train = optimizer.minimize(self.loss)
