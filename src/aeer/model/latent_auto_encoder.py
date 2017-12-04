@@ -87,10 +87,18 @@ class LatentFactorAutoEncoder(object):
                                          initializer=tf.random_uniform_initializer(-eps, eps))
             self.venue_factor = tf.nn.embedding_lookup(venue_bias, self.venue_id,
                                                        name='VenueLookup')
+            v_attn_weight = tf.get_variable('V_AttentionWLogits',
+                                                      shape=[n_hidden, 1])
+            # Multiply Group Factors by a weight vector
+            # We could make this a deeper network...
+            v_attention = tf.nn.softmax(tf.matmul(self.venue_factor, v_attn_weight))
+
+            # Weighted sum of venue factors
+            venue_weighted = tf.reduce_sum(v_attention * self.venue_factor,
+                                      axis=0)
             # Sum all venue factors, then make it a vector so it will broadcast
             # and add it to all instances
-            venue_factor = tf.squeeze(tf.reduce_sum(self.venue_factor, axis=0))
-            preactivation += venue_factor
+            preactivation += tf.squeeze(venue_weighted)
 
         # Add group latent factor
         if n_groups is not None:
