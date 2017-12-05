@@ -124,8 +124,12 @@ class LatentFactorAutoEncoder(object):
         # self.weights_regularizer = tf.nn.l2_loss(W, "weight_loss")
         #self.reg_loss = tf.reduce_sum(tf.abs(W))
 
+        # create the second hidden layer
+        hidden2 = fully_connected(hidden, n_hidden,
+                                       activation_fn=ACTIVATION_FN[hidden_activation])
+
         # create the output layer
-        self.outputs = fully_connected(hidden, n_outputs,
+        self.outputs = fully_connected(hidden2, n_outputs,
                                        activation_fn=ACTIVATION_FN[output_activation])
 
         self.targets = tf.gather_nd(self.outputs, self.gather_indices)
