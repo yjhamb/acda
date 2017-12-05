@@ -191,7 +191,7 @@ def ndcg_at_k(predictions, actuals, k):
     N = min(len(actuals), k)
     cum_gain = 0
     ideal_gain = 1
-    topk = predictions[-k:]
+    topk = predictions[-N:]
     if topk[0] in actuals:
         cum_gain = 1
     # calculate the ideal gain at k
