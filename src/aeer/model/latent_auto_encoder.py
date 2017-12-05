@@ -26,7 +26,7 @@ python latent_auto_encoder.py --nogroup
 """
 parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument('-g', '--gpu', help='set gpu device number 0-3', type=str, default='3')
-parser.add_argument('-e', '--epochs', help='Number of epochs', type=int, default=5)
+parser.add_argument('-e', '--epochs', help='Number of epochs', type=int, default=50)
 parser.add_argument('-s', '--size', help='Number of hidden layer',
                     type=int, default=100)
 parser.add_argument('-n', '--neg_count', help='Number of negatives', type=int,
@@ -263,7 +263,6 @@ def main():
                     model.venue_id: venue_ids,
                     model.y: y
                 })
-
                 epoch_loss += batch_loss
             print("Epoch: {:>16}       Loss: {:>10,.6f}".format("%s/%s" % (epoch, n_epochs),
                                                                 epoch_loss))
@@ -287,7 +286,6 @@ def main():
                     x, _, _ = event_data.get_user_train_events(user_id, 0, 0)
                     group_ids = event_data.get_user_train_groups(user_id)
                     venue_ids = event_data.get_user_train_venues(user_id)
-
                     # Compute score
                     score = sess.run(model.outputs, {
                         model.x: x.toarray().astype(np.float32),

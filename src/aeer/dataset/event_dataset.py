@@ -8,7 +8,7 @@ import sklearn.model_selection as ms
 
 from scipy import sparse
 from scipy.stats import bernoulli
-from sklearn.preprocessing import MultiLabelBinarizer
+from sklearn.preprocessing import MultiLabelBinarizer, LabelEncoder
 import aeer.dataset.user_group_dataset as ug_dataset
 
 rsvp_ny_file = "../../../dataset/rsvp_ny.csv"
@@ -28,34 +28,38 @@ class EventData(object):
 
         # perform the train-test split
         self.train_x, self.test_x, self.train_y, self.test_y = ms.train_test_split(x, y, test_size=0.2, random_state=42)
-        
+
         # split again to generate CV set
         self.train_x, self.cv_x, self.train_y, self.cv_y = ms.train_test_split(self.train_x, self.train_y, test_size=0.2, random_state=42)
-        
+
         self._n_users = len(self.get_users())
         self._n_events = len(self.get_events())
         self._n_groups = len(self.get_groups())
         self._n_venues = len(self.get_venues())
-        
+
         self._user_group_data = ug_dataset.UserGroupData(user_group_file)
 
         # Convert the sparse event indices to a dense vector
-        mlb = MultiLabelBinarizer()
-        mlb.fit([self.get_events()])
+        self._mlb_event = MultiLabelBinarizer(sparse_output=True)
+        self._mlb_event.fit([self.get_events()])
         # We need this to get the indices of events
-        self._event_class_to_index = dict(zip(mlb.classes_, range(len(mlb.classes_))))
+        self._event_class_to_index = dict(zip(self._mlb_event.classes_, range(len(self._mlb_event.classes_))))
 
-        # Convert the sparse group indices to a dense vector
-        mlb_group = MultiLabelBinarizer()
-        mlb_group.fit([self.get_groups()])
-        # We need this to get the indices of groups
-        self._group_class_to_index = dict(zip(mlb_group.classes_, range(len(mlb_group.classes_))))
-        
-        # Convert the sparse group indices to a dense vector
-        mlb_venue = MultiLabelBinarizer()
-        mlb_venue.fit([self.get_venues()])
-        # We need this to get the indices of venues
-        self._venue_class_to_index = dict(zip(mlb_venue.classes_, range(len(mlb_venue.classes_))))
+
+        self._group_encoder = LabelEncoder().fit(self.get_groups())
+        self._venue_encoder = LabelEncoder().fit(self.get_venues())
+
+        # self._mlb_group = MultiLabelBinarizer(sparse_output=True)
+        # self._mlb_group.fit([self.get_groups()])
+        # # We need this to get the indices of groups
+        # self._group_class_to_index = dict(zip(self._mlb_group.classes_, range(len(self._mlb_group.classes_))))
+
+        # # Convert the sparse group indices to a dense vector
+        # self._mlb_venue = MultiLabelBinarizer(sparse_output=True)
+        # self._mlb_venue.fit([self.get_venues()])
+        # # We need this to get the indices of venues
+        # self._venue_class_to_index = dict(zip(self._mlb_venue.classes_, range(len(self._mlb_venue.classes_))))
+
 
     @property
     def n_users(self):
@@ -84,7 +88,7 @@ class EventData(object):
         unique_user_test_events = self.test_x.eventId[self.test_x.memberId == user_id].unique()
         return [self._event_class_to_index[i]
                             for i in unique_user_test_events]
-        
+
     def get_user_cv_event_index(self, user_id):
         """
         Get the converted index of user events
@@ -97,25 +101,16 @@ class EventData(object):
         """
         Get train user group indexes
         """
-        groups = [self._group_class_to_index[i] for i in
-                  self.train_x[self.train_x.memberId == user_id].groupId.unique()]
-        # get groups based on the membership
-        #group_list = []
-        #for g in self.train_x[self.train_x.memberId == user_id].groupId.unique():
-        #    if self._user_group_data.is_user_in_group(user_id, g):
-        #        group_list.append(g)
-        #groups = [self._group_class_to_index[i] for i in group_list]
-        
-        return groups
+        groups = self.train_x[self.train_x.memberId == user_id].groupId.unique()
+        return self._group_encoder.transform(groups)
+
 
     def get_user_train_venues(self, user_id):
         """
         Get train user venue indexes
         """
-        venues = [self._venue_class_to_index[i] for i in
-                  self.train_x[self.train_x.memberId == user_id].venueId.unique()]
-        
-        return venues
+        venues = self.train_x[self.train_x.memberId == user_id].venueId.unique()
+        return self._venue_encoder.transform(venues)
 
     def get_users(self):
         return self.events.memberId.unique()
@@ -168,7 +163,6 @@ class EventData(object):
         """
         return self.get_user_events(user_id, self.test_x)
 
-
     def get_user_events(self, user_id, df, negative_count=0, corrupt_ratio=0):
         """
         This will get a single users events (training or test based on input parameter).
@@ -183,53 +177,49 @@ class EventData(object):
         :param corrupt_ratio: float, [0, 1] the probability of corrupting samples
         :returns: Encoded User Vector, Y Target, item ids
         """
+        # Get positive samples
+        pos_groups = df[df.memberId == user_id].groupId.unique().tolist()
+        pos_venues = df[df.memberId == user_id].venueId.unique().tolist()
+        positives = df.eventId[df.memberId == user_id].unique().tolist()
 
-        event_count = self.n_events
+        # Testing...
+        if negative_count == 0:
+            return self._mlb_event.transform([positives]).tocoo(), None, None
 
-        # Get all positive items
-        positives = [self._event_class_to_index[i] for i in df.eventId[df.memberId == user_id].unique()]
+        x, y, items, groups, venues = [], [], [], [], []
 
-        # Sample negative items
-        if negative_count > 0:
-            negative_count = len(positives)
-            negatives = [self.sample_negative(positives, event_count) for _ in range(negative_count)]
-        else:
-            negatives = []
+        # For each positive we have N negatives
+        # i.e. len(positives) * (neg_count+1)
+        for i in range(len(positives)):
+            # Add a negative example
+            for j in range(negative_count):
+                neg = self._sample_negative_new(positives, self._mlb_event.classes_)
 
-        input_count = len(positives) + len(negatives)
+                neg_group = self._sample_negative_new(pos_groups,
+                                                      self._group_encoder.classes_)
 
-        # X vector for a single user
-        # Duplicate input count times
-        x_data = [1.0] * input_count
+                neg_venue = self._sample_negative_new(pos_venues,
+                                                      self._venue_encoder.classes_)
+                y.append(0) # Negative Target
+                items.append(self._event_class_to_index[neg]) # Negative index
+                x.append(positives + [neg]) # add negative pair
+                # We need to transform single instances with LabelEncoder
+                groups.append(self._group_encoder.transform(pos_groups + [neg_group]))
+                venues.append(self._venue_encoder.transform(pos_venues + [neg_venue]))
+            y.append(1)
+            x.append(positives)
+            groups.append(self._group_encoder.transform(pos_groups))
+            venues.append(self._venue_encoder.transform(pos_venues))
+            items.append(self._event_class_to_index[positives[i]])
 
-        # Indices for the items
-        cols = positives + negatives
-        rows = []
-        if negative_count > 0:
-            for i in range(input_count):
-                rows.extend([i] * input_count)
-            x = sparse.coo_matrix((x_data * input_count,
-                               (rows, cols * input_count)),
-                              shape=(input_count, event_count),
-                              dtype=np.float32)
-        else:
-            rows.extend([0] * input_count)
-            x = sparse.coo_matrix((x_data,
-                               (rows, cols)),
-                              shape=(1, event_count),
-                              dtype=np.float32)
-
-        # Negative targets are 0, positives are 1
-        y_targets = np.zeros(input_count, dtype=np.float32)
-        y_targets[:len(positives)] = 1.0
+        x = self._mlb_event.transform(x).tocoo()
 
         # Sparse Matrix; directly take the data and corrupt it
         if corrupt_ratio > 0:
             x.data = self.corrupt_input(x.data, corrupt_ratio).astype(np.float32)
 
-        return x, y_targets, cols
-    
-    
+        return x.astype(np.float32), np.array(y, dtype=np.float32), items
+
     def get_user_events_pairwise(self, user_id, df, negative_count=0, corrupt_ratio=0):
         """
         This will get a single users events (training or test based on input parameter).
@@ -261,23 +251,23 @@ class EventData(object):
                 negative = [self._event_class_to_index[i] for i in negative_samples.eventId.unique()]
             else:
                 negative = []
-    
+
             # Indices for the items
             cols.extend(positive + negative)
             rows.extend([counter] * (len(positive) + len(negative)))
             counter += 1
-        
+
         if negative_count > 0:
             input_count = len(positives) * 2
         else:
             input_count = len(positives)
-        
+
         x_data.extend([1.0] * input_count)
         x = sparse.coo_matrix((x_data,
                                (rows, cols)),
                               shape=(input_count, event_count),
                               dtype=np.float32)
-            
+
         # Negative targets are 0, positives are 1
         y_targets = np.zeros(input_count, dtype=np.float32)
         y_targets[:len(positives)] = 1.0
@@ -362,13 +352,12 @@ class EventData(object):
         # Sparse Matrix; directly take the data and corrupt it
         if corrupt_ratio > 0:
             x.data = self.corrupt_input(x.data, corrupt_ratio).astype(np.float32)
-            
-        venues = [self._venue_class_to_index[i] for i in
-                  df[df.memberId == user_id].venueId.unique()]
+
+        venues = self._venue_encoder.transform(df[df.memberId == user_id].venueId.unique())
         #if negative_count > 0:
         #    venues.extend([self._venue_class_to_index[i] for i in negative_samples.venueId.unique()])
-        
-        groups = [] 
+
+        groups = []
         for g in df[df.memberId == user_id].groupId.unique():
             if self._user_group_data.is_user_in_group(user_id, g):
                 groups.append(self._group_class_to_index[g])
@@ -391,16 +380,29 @@ class EventData(object):
                 continue
             return sample
 
+    def _sample_negative_new(self, pos_items, all_items):
+        """Sample uniformly items that are not observed
+
+        :param pos_item_map: set/list, listing all of the users observed items
+        :param max_items: int, item count
+        :returns: int negative item id
+        """
+        while True:
+            sample = np.random.choice(all_items)
+            if sample in pos_items:
+                continue
+            return sample
+
 
     def sample_negative_on_context(self, df, user_id, count):
         """Sample uniformly items that are not observed
-        
+
         :param df: Dataframe to be sampled
-        :param user_id: user id for which the samples are to be provided 
+        :param user_id: user id for which the samples are to be provided
         :param count: negative item count
         :returns: int negative item id
         """
-        
+
         return df[df.memberId != user_id].sample(count)
 
 
