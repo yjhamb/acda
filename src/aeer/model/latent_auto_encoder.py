@@ -116,7 +116,7 @@ class LatentFactorAutoEncoder(object):
             group_weighted = tf.reduce_sum(attention * self.group_factor,
                                       axis=0)
             # Add to
-            #preactivation += tf.squeeze(group_weighted)
+            preactivation += tf.squeeze(group_weighted)
 
         hidden = ACTIVATION_FN[hidden_activation](preactivation)
         # add weight regularizer
@@ -127,16 +127,16 @@ class LatentFactorAutoEncoder(object):
         # create the second hidden layer
         #hidden2 = fully_connected(hidden, n_hidden,
         #                               activation_fn=ACTIVATION_FN[hidden_activation])
-        W2 = tf.get_variable('W2', shape=[n_hidden, n_hidden])
-        b2 = tf.get_variable('Bias2', shape=[n_hidden])
-        preactivation2 = tf.nn.xw_plus_b(hidden, W2, b2)
+        #W2 = tf.get_variable('W2', shape=[n_hidden, n_hidden])
+        #b2 = tf.get_variable('Bias2', shape=[n_hidden])
+        #preactivation2 = tf.nn.xw_plus_b(hidden, W2, b2)
         
-        preactivation2 += tf.squeeze(group_weighted)
+        #preactivation2 += tf.squeeze(group_weighted)
         
-        hidden2 = ACTIVATION_FN[hidden_activation](preactivation2)
+        #hidden2 = ACTIVATION_FN[hidden_activation](preactivation2)
 
         # create the output layer
-        self.outputs = fully_connected(hidden2, n_outputs,
+        self.outputs = fully_connected(hidden, n_outputs,
                                        activation_fn=ACTIVATION_FN[output_activation])
 
         self.targets = tf.gather_nd(self.outputs, self.gather_indices)
