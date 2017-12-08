@@ -26,7 +26,7 @@ python latent_auto_encoder.py --nogroup
 """
 parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument('-g', '--gpu', help='set gpu device number 0-3', type=str, default='3')
-parser.add_argument('-e', '--epochs', help='Number of epochs', type=int, default=50)
+parser.add_argument('-e', '--epochs', help='Number of epochs', type=int, default=5)
 parser.add_argument('-s', '--size', help='Number of hidden layer',
                     type=int, default=100)
 parser.add_argument('-n', '--neg_count', help='Number of negatives', type=int,
@@ -125,8 +125,12 @@ class LatentFactorAutoEncoder(object):
         #self.reg_loss = tf.reduce_sum(tf.abs(W))
 
         # create the second hidden layer
-        hidden2 = fully_connected(hidden, n_hidden,
-                                       activation_fn=ACTIVATION_FN[hidden_activation])
+        #hidden2 = fully_connected(hidden, n_hidden,
+        #                               activation_fn=ACTIVATION_FN[hidden_activation])
+        W2 = tf.get_variable('W2', shape=[n_hidden, n_hidden])
+        b2 = tf.get_variable('Bias2', shape=[n_hidden])
+        preactivation2 = tf.nn.xw_plus_b(hidden, W2, b2)
+        hidden2 = ACTIVATION_FN[hidden_activation](preactivation2)
 
         # create the output layer
         self.outputs = fully_connected(hidden2, n_outputs,
