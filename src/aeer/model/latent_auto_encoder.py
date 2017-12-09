@@ -120,8 +120,8 @@ class LatentFactorAutoEncoder(object):
 
         hidden = ACTIVATION_FN[hidden_activation](preactivation)
         # add weight regularizer
-        # self.reg_scale = 0.01
-        # self.weights_regularizer = tf.nn.l2_loss(W, "weight_loss")
+        beta = 0.01
+        reg_loss = tf.nn.l2_loss(W, "weight_loss")
         #self.reg_loss = tf.reduce_sum(tf.abs(W))
 
         # create the second hidden layer
@@ -144,9 +144,8 @@ class LatentFactorAutoEncoder(object):
         self.actuals = tf.placeholder(tf.int64, shape=[None])
 
         # square loss
-        #self.loss = tf.losses.mean_squared_error(self.targets, self.y) + self.reg_scale * self.weights_regularizer
-        self.loss = tf.losses.mean_squared_error(self.targets, self.y)
-        #self.loss = tf.losses.log_loss(self.targets, self.y)
+        self.loss = tf.losses.mean_squared_error(self.targets, self.y) + (beta * reg_loss)
+        #self.loss = tf.losses.mean_squared_error(self.targets, self.y)
         optimizer = tf.train.AdamOptimizer(learning_rate)
         # Train Model
         self.train = optimizer.minimize(self.loss)
@@ -480,4 +479,4 @@ def execute():
 if __name__ == '__main__':
     FLAGS = parser.parse_args()
     os.environ['CUDA_VISIBLE_DEVICES'] = FLAGS.gpu
-    execute()
+    main()
