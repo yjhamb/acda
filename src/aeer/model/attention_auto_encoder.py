@@ -1,6 +1,6 @@
 '''
-Denoising AutoEncoder Implementation that incorporates latent factors for
-contextual group and venue data
+Denoising AutoEncoder Implementation that utilizes the attention mechanism
+to incorporate contextual information such as the group and venue
 '''
 import argparse
 import os
@@ -19,10 +19,10 @@ import aeer.dataset.user_group_dataset as ug_dataset
 Example Usage:
 
 Run for 20 epochs, 100 hidden units and a 0.5 corruption ratio
-python latent_auto_encoder.py --epochs 20 --size 100 --corrupt 0.5
+python attention_auto_encoder.py --epochs 20 --size 100 --corrupt 0.5
 
 To turn off latent factors, eg for group latent factor
-python latent_auto_encoder.py --nogroup
+python attention_auto_encoder.py --nogroup
 """
 parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument('-g', '--gpu', help='set gpu device number 0-3', type=str, default='3')
@@ -47,7 +47,7 @@ parser.add_argument('--output_fn',
                     default='sigmoid', type=str, choices=activation_fn_names)
 
 
-class LatentFactorAutoEncoder(object):
+class AttentionAutoEncoder(object):
 
     def __init__(self, n_inputs, n_hidden, n_outputs, n_groups, n_venues,
                  hidden_activation='relu', output_activation='sigmoid',
@@ -119,11 +119,7 @@ class LatentFactorAutoEncoder(object):
             preactivation += tf.squeeze(group_weighted)
 
         hidden = ACTIVATION_FN[hidden_activation](preactivation)
-        # add weight regularizer
-        #beta = 0.01
-        #reg_loss = tf.nn.l2_loss(W, "weight_loss")
-        #self.reg_loss = tf.reduce_sum(tf.abs(W))
-
+        
         # create the output layer
         self.outputs = fully_connected(hidden, n_outputs,
                                        activation_fn=ACTIVATION_FN[output_activation])
@@ -133,7 +129,6 @@ class LatentFactorAutoEncoder(object):
         self.actuals = tf.placeholder(tf.int64, shape=[None])
 
         # square loss
-        # self.loss = tf.losses.mean_squared_error(self.targets, self.y) + (beta * reg_loss)
         self.loss = tf.losses.mean_squared_error(self.targets, self.y)
         optimizer = tf.train.AdamOptimizer(learning_rate)
         # Train Model
@@ -224,7 +219,7 @@ def main():
         print("Disabling Venue Latent Factor")
         n_venues = None
 
-    model = LatentFactorAutoEncoder(n_inputs, n_hidden, n_outputs, n_groups, n_venues,
+    model = AttentionAutoEncoder(n_inputs, n_hidden, n_outputs, n_groups, n_venues,
                                     FLAGS.hidden_fn, FLAGS.output_fn,
                                     learning_rate=0.001)
 
