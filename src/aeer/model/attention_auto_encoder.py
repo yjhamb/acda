@@ -79,7 +79,11 @@ class AttentionAutoEncoder(object):
 
         # Wx + b + venue + user groups
         preactivation = tf.nn.xw_plus_b(self.x, W, b)
+        hidden = ACTIVATION_FN[hidden_activation](preactivation)
+        
+        attention = hidden
 
+        # setup attention mechanism
         # Add venue latent factor
         if n_venues is not None:
             # Create and lookup each bias
@@ -91,14 +95,14 @@ class AttentionAutoEncoder(object):
                                                       shape=[n_hidden, 1])
             # Multiply Group Factors by a weight vector
             # We could make this a deeper network...
-            v_attention = tf.nn.softmax(tf.matmul(self.venue_factor, v_attn_weight))
+            v_attention = tf.matmul(self.venue_factor, v_attn_weight)
 
             # Weighted sum of venue factors
             venue_weighted = tf.reduce_sum(v_attention * self.venue_factor,
                                       axis=0)
             # Sum all venue factors, then make it a vector so it will broadcast
             # and add it to all instances
-            preactivation += tf.squeeze(venue_weighted)
+            attention += tf.squeeze(venue_weighted)
 
         # Add group latent factor
         if n_groups is not None:
@@ -106,26 +110,27 @@ class AttentionAutoEncoder(object):
                                          initializer=tf.random_uniform_initializer(-eps, eps))
             self.group_factor = tf.nn.embedding_lookup(group_bias, self.group_id,
                                                        name='GroupLookup')
-            attn_weight = tf.get_variable('AttentionWLogits',
+            g_attn_weight = tf.get_variable('AttentionWLogits',
                                                       shape=[n_hidden, 1])
             # Multiply Group Factors by a weight vector
             # We could make this a deeper network...
-            attention = tf.nn.softmax(tf.matmul(self.group_factor, attn_weight))
+            g_attention = tf.matmul(self.group_factor, g_attn_weight)
 
             # Weighted sum of group factors
-            group_weighted = tf.reduce_sum(attention * self.group_factor,
+            group_weighted = tf.reduce_sum(g_attention * self.group_factor,
                                       axis=0)
             # Add to
-            preactivation += tf.squeeze(group_weighted)
+            attention += tf.squeeze(group_weighted)
 
-        hidden = ACTIVATION_FN[hidden_activation](preactivation)
+        attn_output = tf.nn.softmax(tf.nn.tanh(attention))
         
         # create the output layer
-        self.outputs = fully_connected(hidden, n_outputs,
-                                       activation_fn=ACTIVATION_FN[output_activation])
+        W2 = tf.get_variable('W2', shape=[n_hidden, n_outputs])
+        b2 = tf.get_variable('Bias2', shape=[n_outputs])
+        preactivation_output = tf.nn.xw_plus_b(tf.multiply(attn_output, hidden), W2, b2)
+        self.outputs = ACTIVATION_FN[output_activation](preactivation_output)
 
         self.targets = tf.gather_nd(self.outputs, self.gather_indices)
-
         self.actuals = tf.placeholder(tf.int64, shape=[None])
 
         # square loss
