@@ -45,7 +45,7 @@ class EventData(object):
         # We need this to get the indices of events
         self._event_class_to_index = dict(zip(self._mlb_event.classes_, range(len(self._mlb_event.classes_))))
 
-
+        self._user_encoder = LabelEncoder().fit(self.get_users())
         self._group_encoder = LabelEncoder().fit(self.get_groups())
         self._venue_encoder = LabelEncoder().fit(self.get_venues())
 
@@ -111,6 +111,12 @@ class EventData(object):
         """
         venues = self.train_x[self.train_x.memberId == user_id].venueId.unique()
         return self._venue_encoder.transform(venues)
+    
+    def get_user_index(self, user_id):
+        """
+        Get user index
+        """
+        return self._user_encoder.transform([user_id])
 
     def get_users(self):
         return self.events.memberId.unique()

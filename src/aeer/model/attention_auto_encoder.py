@@ -36,6 +36,7 @@ parser.add_argument('-c', '--corrupt', help='Corruption ratio', type=float,
 # Pass the Flag to disable
 parser.add_argument('--nogroup', help='disable group latent factor', action="store_true")
 parser.add_argument('--novenue', help='disable venue latent factor', action="store_true")
+parser.add_argument('--nouser', help='disable user latent factor', action="store_true")
 
 activation_fn_names = ACTIVATION_FN.keys()
 parser.add_argument('--hidden_fn',
@@ -49,7 +50,7 @@ parser.add_argument('--output_fn',
 
 class AttentionAutoEncoder(object):
 
-    def __init__(self, n_inputs, n_hidden, n_outputs, n_groups, n_venues,
+    def __init__(self, n_inputs, n_hidden, n_outputs, n_users, n_groups, n_venues,
                  hidden_activation='relu', output_activation='sigmoid',
                  learning_rate=0.001):
         """
@@ -57,11 +58,13 @@ class AttentionAutoEncoder(object):
         :param n_inputs: int, Number of input features (number of events)
         :param n_hidden: int, Number of hidden units
         :param n_outputs: int, Number of output features (number of events)
+        :param n_users: int, Number of users or None to disable
         :param n_groups: int, Number of groups or None to disable
         :param n_venues: int, Number of venues or None to disable
         :param learning_rate: float, Step size
         """
         self.x = tf.placeholder(tf.float32, shape=[None, n_inputs])
+        self.user_id = tf.placeholder(tf.int32, shape=[None])
         self.group_id = tf.placeholder(tf.int32, shape=[None])
         self.venue_id = tf.placeholder(tf.int32, shape=[None])
 
@@ -84,6 +87,25 @@ class AttentionAutoEncoder(object):
         attention = hidden
 
         # setup attention mechanism
+        
+        # Add user latent factor
+        if n_users is not None:
+            # Create and lookup each bias
+            user_bias = tf.get_variable('UserBias', shape=[n_users, n_hidden],
+                                         initializer=tf.random_uniform_initializer(-eps, eps))
+            self.user_factor = tf.nn.embedding_lookup(user_bias, self.user_id,
+                                                       name='UserLookup')
+            u_attn_weight = tf.get_variable('U_AttentionWLogits',
+                                                      shape=[n_hidden, 1])
+            u_attention = tf.matmul(self.user_factor, u_attn_weight)
+
+            # Weighted sum of venue factors
+            user_weighted = tf.reduce_sum(u_attention * self.user_factor,
+                                      axis=0)
+            # Sum all user factors, then make it a vector so it will broadcast
+            # and add it to all instances
+            attention += tf.squeeze(user_weighted)
+        
         # Add venue latent factor
         if n_venues is not None:
             # Create and lookup each bias
@@ -93,8 +115,6 @@ class AttentionAutoEncoder(object):
                                                        name='VenueLookup')
             v_attn_weight = tf.get_variable('V_AttentionWLogits',
                                                       shape=[n_hidden, 1])
-            # Multiply Group Factors by a weight vector
-            # We could make this a deeper network...
             v_attention = tf.matmul(self.venue_factor, v_attn_weight)
 
             # Weighted sum of venue factors
@@ -112,8 +132,6 @@ class AttentionAutoEncoder(object):
                                                        name='GroupLookup')
             g_attn_weight = tf.get_variable('AttentionWLogits',
                                                       shape=[n_hidden, 1])
-            # Multiply Group Factors by a weight vector
-            # We could make this a deeper network...
             g_attention = tf.matmul(self.group_factor, g_attn_weight)
 
             # Weighted sum of group factors
@@ -210,6 +228,7 @@ def main():
     event_data = ds.EventData(ds.rsvp_chicago_file, ug_dataset.user_group_chicago_file)
     users = event_data.get_train_users()
 
+    n_users = event_data.n_users
     n_inputs = event_data.n_events
     n_groups = event_data.n_groups
     n_outputs = event_data.n_events
@@ -223,8 +242,12 @@ def main():
     if FLAGS.novenue:
         print("Disabling Venue Latent Factor")
         n_venues = None
+    
+    if FLAGS.nouser:
+        print("Disabling User Latent Factor")
+        n_users = None
 
-    model = AttentionAutoEncoder(n_inputs, n_hidden, n_outputs, n_groups, n_venues,
+    model = AttentionAutoEncoder(n_inputs, n_hidden, n_outputs, n_users, n_groups, n_venues,
                                     FLAGS.hidden_fn, FLAGS.output_fn,
                                     learning_rate=0.001)
 
@@ -247,6 +270,7 @@ def main():
                 x, y, item = event_data.get_user_train_events(
                                                     user_id, NEG_COUNT, CORRUPT_RATIO)
 
+                user_index = event_data.get_user_index(user_id)
                 group_ids = event_data.get_user_train_groups(user_id)
                 venue_ids = event_data.get_user_train_venues(user_id)
 
@@ -258,6 +282,7 @@ def main():
                 batch_loss, _ = sess.run([model.loss, model.train], {
                     model.x: x.toarray().astype(np.float32),
                     model.gather_indices: gather_indices,
+                    model.user_id: user_index,
                     model.group_id: group_ids,
                     model.venue_id: venue_ids,
                     model.y: y
@@ -283,11 +308,13 @@ def main():
                     test_event_index = event_data.get_user_cv_event_index(user_id)
 
                     x, _, _ = event_data.get_user_train_events(user_id, 0, 0)
+                    user_index = event_data.get_user_index(user_id)
                     group_ids = event_data.get_user_train_groups(user_id)
                     venue_ids = event_data.get_user_train_venues(user_id)
                     # Compute score
                     score = sess.run(model.outputs, {
                         model.x: x.toarray().astype(np.float32),
+                        model.user_id: user_index,
                         model.group_id: group_ids,
                         model.venue_id: venue_ids,
                     })[0] # We only do one sample at a time, take 0 index
