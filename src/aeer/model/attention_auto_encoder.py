@@ -79,14 +79,8 @@ class AttentionAutoEncoder(object):
 
         # Uniform Initialization U(-eps, eps)
         eps = 0.01
-
-        # Wx + b + venue + user groups
-        preactivation = tf.nn.xw_plus_b(self.x, W, b)
-        hidden = ACTIVATION_FN[hidden_activation](preactivation)
         
-        attention = hidden
-
-        # setup attention mechanism
+        preactivation = tf.nn.xw_plus_b(self.x, W, b)
         
         # Add user latent factor
         if n_users is not None:
@@ -104,8 +98,13 @@ class AttentionAutoEncoder(object):
                                       axis=0)
             # Sum all user factors, then make it a vector so it will broadcast
             # and add it to all instances
-            attention += tf.squeeze(user_weighted)
+            preactivation += tf.squeeze(user_weighted)
+
+        hidden = ACTIVATION_FN[hidden_activation](preactivation)
         
+        attention = hidden
+
+        # setup attention mechanism
         # Add venue latent factor
         if n_venues is not None:
             # Create and lookup each bias
