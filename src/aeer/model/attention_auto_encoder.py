@@ -152,8 +152,7 @@ class AttentionAutoEncoder(object):
         self.actuals = tf.placeholder(tf.int64, shape=[None])
 
         # square loss
-        #self.loss = tf.losses.mean_squared_error(self.targets, self.y)
-        self.loss = tf.losses.sigmoid_cross_entropy(self.targets, self.y)
+        self.loss = tf.losses.mean_squared_error(self.targets, self.y)
         optimizer = tf.train.AdamOptimizer(learning_rate)
         # Train Model
         self.train = optimizer.minimize(self.loss)
