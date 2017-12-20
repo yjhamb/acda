@@ -73,8 +73,9 @@ class AttentionAutoEncoder(object):
 
         self.y = tf.placeholder(tf.float32, shape=[None])
 
+        reg_constant = 0.01
         # Weights
-        W = tf.get_variable('W', shape=[n_inputs, n_hidden])
+        W = tf.get_variable('W', shape=[n_inputs, n_hidden], regularizer=tf.contrib.layers.l2_regularizer(scale=reg_constant))
         b = tf.get_variable('Bias', shape=[n_hidden])
 
         # Uniform Initialization U(-eps, eps)
@@ -90,7 +91,7 @@ class AttentionAutoEncoder(object):
             self.user_factor = tf.nn.embedding_lookup(user_bias, self.user_id,
                                                        name='UserLookup')
             u_attn_weight = tf.get_variable('U_AttentionWLogits',
-                                                      shape=[n_hidden, 1])
+                                                      shape=[n_hidden, 1], regularizer=tf.contrib.layers.l2_regularizer(scale=reg_constant))
             u_attention = tf.matmul(self.user_factor, u_attn_weight)
 
             # Weighted sum of venue factors
@@ -113,7 +114,7 @@ class AttentionAutoEncoder(object):
             self.venue_factor = tf.nn.embedding_lookup(venue_bias, self.venue_id,
                                                        name='VenueLookup')
             v_attn_weight = tf.get_variable('V_AttentionWLogits',
-                                                      shape=[n_hidden, 1])
+                                                      shape=[n_hidden, 1], regularizer=tf.contrib.layers.l2_regularizer(scale=reg_constant))
             v_attention = tf.matmul(self.venue_factor, v_attn_weight)
 
             # Weighted sum of venue factors
@@ -130,7 +131,7 @@ class AttentionAutoEncoder(object):
             self.group_factor = tf.nn.embedding_lookup(group_bias, self.group_id,
                                                        name='GroupLookup')
             g_attn_weight = tf.get_variable('AttentionWLogits',
-                                                      shape=[n_hidden, 1])
+                                                      shape=[n_hidden, 1], regularizer=tf.contrib.layers.l2_regularizer(scale=reg_constant))
             g_attention = tf.matmul(self.group_factor, g_attn_weight)
 
             # Weighted sum of group factors
@@ -142,7 +143,7 @@ class AttentionAutoEncoder(object):
         attn_output = tf.nn.softmax(tf.nn.tanh(attention))
         
         # create the output layer
-        W2 = tf.get_variable('W2', shape=[n_hidden, n_outputs])
+        W2 = tf.get_variable('W2', shape=[n_hidden, n_outputs], regularizer=tf.contrib.layers.l2_regularizer(scale=reg_constant))
         b2 = tf.get_variable('Bias2', shape=[n_outputs])
         preactivation_output = tf.nn.xw_plus_b(tf.multiply(attn_output, hidden), W2, b2)
         self.outputs = ACTIVATION_FN[output_activation](preactivation_output)
@@ -151,13 +152,10 @@ class AttentionAutoEncoder(object):
         self.actuals = tf.placeholder(tf.int64, shape=[None])
         
         # add weight regularizer
-        beta = 0.01
-        reg_loss_W = tf.nn.l2_loss(W, "weight_loss")
-        reg_loss_W2 = tf.nn.l2_loss(W2, "weight_loss2")
-        #self.reg_loss = tf.reduce_sum(tf.abs(W))
-
+        reg_losses = tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES)
+        
         # square loss
-        self.loss = tf.losses.mean_squared_error(self.targets, self.y) + (beta * reg_loss_W) + (beta * reg_loss_W2) 
+        self.loss = tf.losses.mean_squared_error(self.targets, self.y) + sum(reg_losses) 
         #self.loss = tf.losses.mean_squared_error(self.targets, self.y)
         optimizer = tf.train.AdamOptimizer(learning_rate)
         # Train Model
