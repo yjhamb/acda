@@ -73,7 +73,7 @@ class AttentionAutoEncoder(object):
 
         self.y = tf.placeholder(tf.float32, shape=[None])
 
-        reg_constant = 0.01
+        reg_constant = 0.05
         # Weights
         W = tf.get_variable('W', shape=[n_inputs, n_hidden], regularizer=tf.contrib.layers.l2_regularizer(scale=reg_constant))
         b = tf.get_variable('Bias', shape=[n_hidden])
