@@ -72,8 +72,9 @@ class AttentionAutoEncoder(object):
         self.gather_indices = tf.placeholder(tf.int32, shape=[None, 2])
 
         self.y = tf.placeholder(tf.float32, shape=[None])
+        self.mode = tf.placeholder(tf.string)
 
-        reg_constant = 0.05
+        reg_constant = 0.01
         # Weights
         W = tf.get_variable('W', shape=[n_inputs, n_hidden], regularizer=tf.contrib.layers.l2_regularizer(scale=reg_constant))
         b = tf.get_variable('Bias', shape=[n_hidden])
@@ -102,6 +103,9 @@ class AttentionAutoEncoder(object):
             preactivation += tf.squeeze(user_weighted)
 
         hidden = ACTIVATION_FN[hidden_activation](preactivation)
+        keep_prob = 0.5
+        if self.mode == 'TRAIN':
+            hidden = tf.nn.dropout(hidden, keep_prob)
         
         attention = hidden
 
@@ -155,8 +159,8 @@ class AttentionAutoEncoder(object):
         reg_losses = tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES)
         
         # square loss
-        self.loss = tf.losses.mean_squared_error(self.targets, self.y) + sum(reg_losses) 
-        #self.loss = tf.losses.mean_squared_error(self.targets, self.y)
+        #self.loss = tf.losses.mean_squared_error(self.targets, self.y) + sum(reg_losses) 
+        self.loss = tf.losses.mean_squared_error(self.targets, self.y)
         optimizer = tf.train.AdamOptimizer(learning_rate)
         # Train Model
         self.train = optimizer.minimize(self.loss)
@@ -289,7 +293,8 @@ def main():
                     model.user_id: user_index,
                     model.group_id: group_ids,
                     model.venue_id: venue_ids,
-                    model.y: y
+                    model.y: y,
+                    model.mode: 'TRAIN'
                 })
                 epoch_loss += batch_loss
             print("Epoch: {:>16}       Loss: {:>10,.6f}".format("%s/%s" % (epoch, n_epochs),
