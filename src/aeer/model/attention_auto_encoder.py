@@ -72,7 +72,7 @@ class AttentionAutoEncoder(object):
         self.gather_indices = tf.placeholder(tf.int32, shape=[None, 2])
 
         self.y = tf.placeholder(tf.float32, shape=[None])
-        self.mode = tf.placeholder(tf.string)
+        self.dropout = tf.placeholder_with_default(1.0, shape=(), name='Dropout')
 
         reg_constant = 0.01
         # Weights
@@ -103,12 +103,9 @@ class AttentionAutoEncoder(object):
             preactivation += tf.squeeze(user_weighted)
 
         hidden = ACTIVATION_FN[hidden_activation](preactivation)
-        keep_prob = 0.5
-        if self.mode == 'TRAIN':
-            hidden = tf.nn.dropout(hidden, keep_prob)
+        hidden = tf.nn.dropout(hidden, self.dropout)
         
         attention = hidden
-
         # setup attention mechanism
         # Add venue latent factor
         if n_venues is not None:
@@ -294,7 +291,7 @@ def main():
                     model.group_id: group_ids,
                     model.venue_id: venue_ids,
                     model.y: y,
-                    model.mode: 'TRAIN'
+                    model.dropout: 0.5
                 })
                 epoch_loss += batch_loss
             print("Epoch: {:>16}       Loss: {:>10,.6f}".format("%s/%s" % (epoch, n_epochs),
@@ -326,6 +323,7 @@ def main():
                         model.user_id: user_index,
                         model.group_id: group_ids,
                         model.venue_id: venue_ids,
+                        model.dropout: 1.0
                     })[0] # We only do one sample at a time, take 0 index
 
                     # Sorted in ascending order, we then take the last values
