@@ -103,7 +103,7 @@ class AttentionAutoEncoder(object):
             preactivation += tf.squeeze(user_weighted)
 
         hidden = ACTIVATION_FN[hidden_activation](preactivation)
-        hidden = tf.nn.dropout(hidden, self.dropout)
+        #hidden = tf.nn.dropout(hidden, self.dropout)
         
         attention = hidden
         # setup attention mechanism
