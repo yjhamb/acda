@@ -103,7 +103,7 @@ class AttentionAutoEncoder(object):
             preactivation += tf.squeeze(user_weighted)
 
         hidden = ACTIVATION_FN[hidden_activation](preactivation)
-        #hidden = tf.nn.dropout(hidden, self.dropout)
+        hidden = tf.nn.dropout(hidden, self.dropout)
         
         attention = hidden
         # setup attention mechanism
@@ -291,7 +291,7 @@ def main():
                     model.group_id: group_ids,
                     model.venue_id: venue_ids,
                     model.y: y,
-                    model.dropout: 0.5
+                    model.dropout: 0.8
                 })
                 epoch_loss += batch_loss
             print("Epoch: {:>16}       Loss: {:>10,.6f}".format("%s/%s" % (epoch, n_epochs),
