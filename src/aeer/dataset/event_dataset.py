@@ -27,10 +27,10 @@ class EventData(object):
         y = events_sorted[['rsvpRating']]
 
         # perform the train-test split
-        self.train_x, self.test_x, self.train_y, self.test_y = ms.train_test_split(x, y, test_size=0.1, random_state=42)
+        self.train_x, self.test_x, self.train_y, self.test_y = ms.train_test_split(x, y, test_size=0.2, random_state=42)
 
         # split again to generate CV set
-        self.train_x, self.cv_x, self.train_y, self.cv_y = ms.train_test_split(self.train_x, self.train_y, test_size=0.1, random_state=42)
+        self.train_x, self.cv_x, self.train_y, self.cv_y = ms.train_test_split(self.train_x, self.train_y, test_size=0.2, random_state=42)
 
         self._n_users = len(self.get_users())
         self._n_events = len(self.get_events())
