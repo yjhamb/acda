@@ -153,11 +153,11 @@ class AttentionAutoEncoder(object):
         self.actuals = tf.placeholder(tf.int64, shape=[None])
         
         # add weight regularizer
-        reg_losses = tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES)
+        #reg_losses = tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES)
         
         # square loss
-        self.loss = tf.losses.mean_squared_error(self.targets, self.y) + sum(reg_losses) 
-        #self.loss = tf.losses.mean_squared_error(self.targets, self.y)
+        #self.loss = tf.losses.mean_squared_error(self.targets, self.y) + sum(reg_losses) 
+        self.loss = tf.losses.mean_squared_error(self.targets, self.y)
         optimizer = tf.train.AdamOptimizer(learning_rate)
         # Train Model
         self.train = optimizer.minimize(self.loss)
