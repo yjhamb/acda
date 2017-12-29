@@ -63,6 +63,18 @@ class AttentionAutoEncoder(object):
         :param n_venues: int, Number of venues or None to disable
         :param learning_rate: float, Step size
         """
+        
+        with tf.name_scope("LearningRateDecay"):
+        # Note the trainable = false
+            self.learning_rate = tf.Variable(float(learning_rate),
+                                             trainable=False, dtype=tf.float32)
+            # Placeholder to decay learning rate by some amount
+            self._learning_rate_decay_factor = tf.placeholder(tf.float32,
+                                                              name='LearningRateDecayFactor')
+            # Operation to decay learning rate
+            self._learning_rate_decay_op = self.learning_rate.assign(
+                self.learning_rate * self._learning_rate_decay_factor)
+            
         self.x = tf.placeholder(tf.float32, shape=[None, n_inputs])
         self.user_id = tf.placeholder(tf.int32, shape=[None])
         self.group_id = tf.placeholder(tf.int32, shape=[None])
@@ -158,9 +170,17 @@ class AttentionAutoEncoder(object):
         # square loss
         #self.loss = tf.losses.mean_squared_error(self.targets, self.y) + sum(reg_losses) 
         self.loss = tf.losses.mean_squared_error(self.targets, self.y)
-        optimizer = tf.train.AdamOptimizer(learning_rate)
+        optimizer = tf.train.AdamOptimizer(self.learning_rate)
         # Train Model
         self.train = optimizer.minimize(self.loss)
+        
+    def decay_learning_rate(self, session, learning_rate_decay):
+        """
+        Decay the current learning rate by decay amount
+        New Learning Rate = Current Learning Rate * Rate Decay
+        """
+        session.run(self._learning_rate_decay_op,
+                    {self._learning_rate_decay_factor: learning_rate_decay})
 
 def precision_at_k(predictions, actuals, k):
     """
@@ -270,6 +290,8 @@ def main():
             # additive gaussian noise or multiplicative mask-out/drop-out noise
             epoch_loss = 0.0
             users = shuffle(users)
+            
+            model.decay_learning_rate(sess, 0.5)
 
             for user_id in users:
                 x, y, item = event_data.get_user_train_events(
