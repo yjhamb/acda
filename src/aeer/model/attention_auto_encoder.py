@@ -288,11 +288,11 @@ def main():
         init_local.run()
         for epoch in range(n_epochs):
             # additive gaussian noise or multiplicative mask-out/drop-out noise
+            prev_epoch_loss = 0.0
             epoch_loss = 0.0
             users = shuffle(users)
-            
-            model.decay_learning_rate(sess, 0.5)
 
+            print("Training the model...")
             for user_id in users:
                 x, y, item = event_data.get_user_train_events(
                                                     user_id, NEG_COUNT, CORRUPT_RATIO)
@@ -318,8 +318,14 @@ def main():
                 epoch_loss += batch_loss
             print("Epoch: {:>16}       Loss: {:>10,.6f}".format("%s/%s" % (epoch, n_epochs),
                                                                 epoch_loss))
-
-            # evaluate the model on the test set
+            print()
+            if prev_epoch_loss != 0 and abs(epoch_loss - prev_epoch_loss) < 1:
+                print("Decaying learning rate...")
+                model.decay_learning_rate(sess, 0.5)
+                
+            prev_epoch_loss = epoch_loss
+            
+            # evaluate the model on the cv set
             cv_users = event_data.get_cv_users()
             precision = []
             recall = []
@@ -327,6 +333,7 @@ def main():
             ndcg = []
             eval_at = [5, 10]
 
+            print("Evaluating on the CV set...")
             valid_test_users = 0
             for user_id in cv_users:
                 # check if user was present in training data
