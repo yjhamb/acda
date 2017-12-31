@@ -286,9 +286,9 @@ def main():
     with tf.Session(config=tf_config) as sess:
         init.run()
         init_local.run()
+        prev_epoch_loss = 0.0
         for epoch in range(n_epochs):
             # additive gaussian noise or multiplicative mask-out/drop-out noise
-            prev_epoch_loss = 0.0
             epoch_loss = 0.0
             users = shuffle(users)
 
