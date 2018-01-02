@@ -156,7 +156,8 @@ class AttentionAutoEncoder(object):
         attn_output = tf.nn.softmax(tf.nn.tanh(attention))
         
         # create the output layer
-        W2 = tf.get_variable('W2', shape=[n_hidden, n_outputs], regularizer=tf.contrib.layers.l2_regularizer(scale=reg_constant))
+        #W2 = tf.get_variable('W2', shape=[n_hidden, n_outputs], regularizer=tf.contrib.layers.l2_regularizer(scale=reg_constant))
+        W2 = tf.transpose(W)
         b2 = tf.get_variable('Bias2', shape=[n_outputs])
         preactivation_output = tf.nn.xw_plus_b(tf.multiply(attn_output, hidden), W2, b2)
         self.outputs = ACTIVATION_FN[output_activation](preactivation_output)
@@ -323,7 +324,7 @@ def main():
                 print("Decaying learning rate...")
                 model.decay_learning_rate(sess, 0.5)
                 
-            prev_epoch_loss = epoch_loss
+            #prev_epoch_loss = epoch_loss
             
             # evaluate the model on the cv set
             cv_users = event_data.get_cv_users()
