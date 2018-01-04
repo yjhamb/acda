@@ -63,20 +63,8 @@ class AttentionAutoEncoder(object):
         :param n_venues: int, Number of venues or None to disable
         :param learning_rate: float, Step size
         """
-        
-        with tf.name_scope("LearningRateDecay"):
-        # Note the trainable = false
-            self.learning_rate = tf.Variable(float(learning_rate),
-                                             trainable=False, dtype=tf.float32)
-            # Placeholder to decay learning rate by some amount
-            self._learning_rate_decay_factor = tf.placeholder(tf.float32,
-                                                              name='LearningRateDecayFactor')
-            # Operation to decay learning rate
-            self._learning_rate_decay_op = self.learning_rate.assign(
-                self.learning_rate * self._learning_rate_decay_factor)
             
         self.x = tf.placeholder(tf.float32, shape=[None, n_inputs])
-        self.user_id = tf.placeholder(tf.int32, shape=[None])
         self.group_id = tf.placeholder(tf.int32, shape=[None])
         self.venue_id = tf.placeholder(tf.int32, shape=[None])
 
@@ -93,26 +81,14 @@ class AttentionAutoEncoder(object):
 
         # Uniform Initialization U(-eps, eps)
         eps = 0.01
+        scale = tf.Variable(tf.ones([n_hidden]))
+        beta = tf.Variable(tf.zeros([n_hidden]))
+        epsilon = 1e-3
         
         preactivation = tf.nn.xw_plus_b(self.x, W, b)
-        
-        # Add user latent factor
-        if n_users is not None:
-            # Create and lookup each bias
-            user_bias = tf.get_variable('UserBias', shape=[n_users, n_hidden],
-                                         initializer=tf.random_uniform_initializer(-eps, eps))
-            self.user_factor = tf.nn.embedding_lookup(user_bias, self.user_id,
-                                                       name='UserLookup')
-            u_attn_weight = tf.get_variable('U_AttentionWLogits',
-                                                      shape=[n_hidden, 1], regularizer=tf.contrib.layers.l2_regularizer(scale=reg_constant))
-            u_attention = tf.matmul(self.user_factor, u_attn_weight)
-
-            # Weighted sum of venue factors
-            user_weighted = tf.reduce_sum(u_attention * self.user_factor,
-                                      axis=0)
-            # Sum all user factors, then make it a vector so it will broadcast
-            # and add it to all instances
-            preactivation += tf.squeeze(user_weighted)
+        # perform batch normalization
+        u_mean, u_var = tf.nn.moments(preactivation, [0])
+        preactivation = tf.nn.batch_normalization(preactivation, u_mean, u_var, beta, scale, epsilon)
 
         hidden = ACTIVATION_FN[hidden_activation](preactivation)
         hidden = tf.nn.dropout(hidden, self.dropout)
@@ -160,6 +136,11 @@ class AttentionAutoEncoder(object):
         #W2 = tf.transpose(W)
         b2 = tf.get_variable('Bias2', shape=[n_outputs])
         preactivation_output = tf.nn.xw_plus_b(tf.multiply(attn_output, hidden), W2, b2)
+        # perform batch normalization
+        scale = tf.Variable(tf.ones([n_outputs]))
+        beta = tf.Variable(tf.zeros([n_outputs]))
+        u_mean, u_var = tf.nn.moments(preactivation_output, [0])
+        preactivation_output = tf.nn.batch_normalization(preactivation_output, u_mean, u_var, beta, scale, epsilon)
         self.outputs = ACTIVATION_FN[output_activation](preactivation_output)
 
         self.targets = tf.gather_nd(self.outputs, self.gather_indices)
@@ -171,17 +152,9 @@ class AttentionAutoEncoder(object):
         # square loss
         #self.loss = tf.losses.mean_squared_error(self.targets, self.y) + sum(reg_losses) 
         self.loss = tf.losses.mean_squared_error(self.targets, self.y)
-        optimizer = tf.train.AdamOptimizer(self.learning_rate)
+        optimizer = tf.train.AdamOptimizer(learning_rate)
         # Train Model
         self.train = optimizer.minimize(self.loss)
-        
-    def decay_learning_rate(self, session, learning_rate_decay):
-        """
-        Decay the current learning rate by decay amount
-        New Learning Rate = Current Learning Rate * Rate Decay
-        """
-        session.run(self._learning_rate_decay_op,
-                    {self._learning_rate_decay_factor: learning_rate_decay})
 
 def precision_at_k(predictions, actuals, k):
     """
@@ -310,7 +283,7 @@ def main():
                 batch_loss, _ = sess.run([model.loss, model.train], {
                     model.x: x.toarray().astype(np.float32),
                     model.gather_indices: gather_indices,
-                    model.user_id: user_index,
+                    #model.user_id: user_index,
                     model.group_id: group_ids,
                     model.venue_id: venue_ids,
                     model.y: y,
@@ -350,7 +323,7 @@ def main():
                     # Compute score
                     score = sess.run(model.outputs, {
                         model.x: x.toarray().astype(np.float32),
-                        model.user_id: user_index,
+                        #model.user_id: user_index,
                         model.group_id: group_ids,
                         model.venue_id: venue_ids,
                         model.dropout: 1.0
