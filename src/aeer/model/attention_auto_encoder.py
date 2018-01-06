@@ -85,7 +85,7 @@ class AttentionAutoEncoder(object):
         preactivation = tf.nn.xw_plus_b(self.x, W, b)
         # perform batch normalization
         u_mean, u_var = tf.nn.moments(preactivation, [0])
-        preactivation = tf.nn.batch_normalization(preactivation, u_mean, u_var, beta, scale, epsilon)
+        #preactivation = tf.nn.batch_normalization(preactivation, u_mean, u_var, beta, scale, epsilon)
 
         hidden = ACTIVATION_FN[hidden_activation](preactivation)
         hidden = tf.nn.dropout(hidden, self.dropout)
@@ -136,7 +136,7 @@ class AttentionAutoEncoder(object):
         scale = tf.Variable(tf.ones([n_outputs]))
         beta = tf.Variable(tf.zeros([n_outputs]))
         u_mean, u_var = tf.nn.moments(preactivation_output, [0])
-        preactivation_output = tf.nn.batch_normalization(preactivation_output, u_mean, u_var, beta, scale, epsilon)
+        #preactivation_output = tf.nn.batch_normalization(preactivation_output, u_mean, u_var, beta, scale, epsilon)
         self.outputs = ACTIVATION_FN[output_activation](preactivation_output)
 
         self.targets = tf.gather_nd(self.outputs, self.gather_indices)
