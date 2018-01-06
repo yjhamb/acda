@@ -7,7 +7,6 @@ import os
 
 import aeer.dataset.event_dataset as ds
 import tensorflow as tf
-from tensorflow.contrib.layers import fully_connected
 
 import numpy as np
 from sklearn.utils import shuffle
@@ -36,7 +35,6 @@ parser.add_argument('-c', '--corrupt', help='Corruption ratio', type=float,
 # Pass the Flag to disable
 parser.add_argument('--nogroup', help='disable group latent factor', action="store_true")
 parser.add_argument('--novenue', help='disable venue latent factor', action="store_true")
-parser.add_argument('--nouser', help='disable user latent factor', action="store_true")
 
 activation_fn_names = ACTIVATION_FN.keys()
 parser.add_argument('--hidden_fn',
@@ -50,7 +48,7 @@ parser.add_argument('--output_fn',
 
 class AttentionAutoEncoder(object):
 
-    def __init__(self, n_inputs, n_hidden, n_outputs, n_users, n_groups, n_venues,
+    def __init__(self, n_inputs, n_hidden, n_outputs, n_groups, n_venues,
                  hidden_activation='relu', output_activation='sigmoid',
                  learning_rate=0.001):
         """
@@ -58,7 +56,6 @@ class AttentionAutoEncoder(object):
         :param n_inputs: int, Number of input features (number of events)
         :param n_hidden: int, Number of hidden units
         :param n_outputs: int, Number of output features (number of events)
-        :param n_users: int, Number of users or None to disable
         :param n_groups: int, Number of groups or None to disable
         :param n_venues: int, Number of venues or None to disable
         :param learning_rate: float, Step size
@@ -133,7 +130,6 @@ class AttentionAutoEncoder(object):
         
         # create the output layer
         W2 = tf.get_variable('W2', shape=[n_hidden, n_outputs], regularizer=tf.contrib.layers.l2_regularizer(scale=reg_constant))
-        #W2 = tf.transpose(W)
         b2 = tf.get_variable('Bias2', shape=[n_outputs])
         preactivation_output = tf.nn.xw_plus_b(tf.multiply(attn_output, hidden), W2, b2)
         # perform batch normalization
@@ -166,7 +162,8 @@ def precision_at_k(predictions, actuals, k):
     """
     N = len(actuals)
     hits = len(set(predictions[-k:]).intersection(set(actuals)))
-    precision = hits / min(N, k)
+    #precision = hits / min(N, k)
+    precision = hits / k
     return precision
 
 def recall_at_k(predictions, actuals, k):
@@ -212,9 +209,9 @@ def ndcg_at_k(predictions, actuals, k):
         cum_gain = 1
     # calculate the ideal gain at k
     for i in range(2, N):
-        ideal_gain += 1 / np.log2(i)
+        ideal_gain += 1 / np.log2(i + 1)
         if topk[i] in actuals:
-            cum_gain += 1 / np.log2(i)
+            cum_gain += 1 / np.log2(i + 1)
 
     return cum_gain / ideal_gain
 
@@ -227,7 +224,6 @@ def main():
     event_data = ds.EventData(ds.rsvp_chicago_file, ug_dataset.user_group_chicago_file)
     users = event_data.get_train_users()
 
-    n_users = event_data.n_users
     n_inputs = event_data.n_events
     n_groups = event_data.n_groups
     n_outputs = event_data.n_events
@@ -241,12 +237,8 @@ def main():
     if FLAGS.novenue:
         print("Disabling Venue Latent Factor")
         n_venues = None
-    
-    if FLAGS.nouser:
-        print("Disabling User Latent Factor")
-        n_users = None
 
-    model = AttentionAutoEncoder(n_inputs, n_hidden, n_outputs, n_users, n_groups, n_venues,
+    model = AttentionAutoEncoder(n_inputs, n_hidden, n_outputs, n_groups, n_venues,
                                     FLAGS.hidden_fn, FLAGS.output_fn,
                                     learning_rate=0.001)
 
@@ -271,7 +263,6 @@ def main():
                 x, y, item = event_data.get_user_train_events(
                                                     user_id, NEG_COUNT, CORRUPT_RATIO)
 
-                user_index = event_data.get_user_index(user_id)
                 group_ids = event_data.get_user_train_groups(user_id)
                 venue_ids = event_data.get_user_train_venues(user_id)
 
@@ -283,7 +274,6 @@ def main():
                 batch_loss, _ = sess.run([model.loss, model.train], {
                     model.x: x.toarray().astype(np.float32),
                     model.gather_indices: gather_indices,
-                    #model.user_id: user_index,
                     model.group_id: group_ids,
                     model.venue_id: venue_ids,
                     model.y: y,
@@ -317,13 +307,11 @@ def main():
                     test_event_index = event_data.get_user_cv_event_index(user_id)
 
                     x, _, _ = event_data.get_user_train_events(user_id, 0, 0)
-                    user_index = event_data.get_user_index(user_id)
                     group_ids = event_data.get_user_train_groups(user_id)
                     venue_ids = event_data.get_user_train_venues(user_id)
                     # Compute score
                     score = sess.run(model.outputs, {
                         model.x: x.toarray().astype(np.float32),
-                        #model.user_id: user_index,
                         model.group_id: group_ids,
                         model.venue_id: venue_ids,
                         model.dropout: 1.0
@@ -368,7 +356,73 @@ def main():
             print(f"MAP@5:       {avg_map_5:>10.6f}       MAP@10:       {avg_map_10:>10.6f}")
             print(f"NDCG@5:      {avg_ndcg_5:>10.6f}       NDCG@10:      {avg_ndcg_10:>10.6f}")
             print()
+        
+        # evaluate on test users
+        print("Evaluating on the test set...")
+        valid_test_users = 0
+        precision = []
+        recall = []
+        mean_avg_prec = []
+        ndcg = []
+        eval_at = [5, 10]
+        for user_id in event_data.get_test_users():
+            # check if user was present in training data
+            train_users = event_data.get_train_users()
+            if user_id in train_users:
+                valid_test_users = valid_test_users + 1
+                test_event_index = event_data.get_user_test_event_index(user_id)
 
+                x, _, _ = event_data.get_user_train_events(user_id, 0, 0)
+                group_ids = event_data.get_user_train_groups(user_id)
+                venue_ids = event_data.get_user_train_venues(user_id)
+                # Compute score
+                score = sess.run(model.outputs, {
+                    model.x: x.toarray().astype(np.float32),
+                    model.group_id: group_ids,
+                    model.venue_id: venue_ids,
+                    model.dropout: 1.0
+                })[0] # We only do one sample at a time, take 0 index
+
+                # Sorted in ascending order, we then take the last values
+                index = np.argsort(score)
+
+                # Number of test instances
+                preck = []
+                recallk = []
+                mapk = []
+                ndcgk = []
+                for k in eval_at:
+                    preck.append(precision_at_k(index, test_event_index, k))
+                    recallk.append(recall_at_k(index, test_event_index, k))
+                    mapk.append(map_at_k(index, test_event_index, k))
+                    ndcgk.append(ndcg_at_k(index, test_event_index, k))
+
+                precision.append(preck)
+                recall.append(recallk)
+                mean_avg_prec.append(mapk)
+                ndcg.append(ndcgk)
+
+        if valid_test_users > 0:
+            # Unpack the lists zip(*[[1,2], [3, 4]]) => [1,3], [2,4]
+            avg_precision_5, avg_precision_10 = zip(*precision)
+            avg_precision_5, avg_precision_10 = np.mean(avg_precision_5), np.mean(avg_precision_10)
+
+            avg_recall_5, avg_recall_10 = zip(*recall)
+            avg_recall_5, avg_recall_10 = np.mean(avg_recall_5), np.mean(avg_recall_10)
+
+            avg_map_5, avg_map_10 = zip(*mean_avg_prec)
+            avg_map_5, avg_map_10 = np.mean(avg_map_5), np.mean(avg_map_10)
+
+            avg_ndcg_5, avg_ndcg_10 = zip(*ndcg)
+            avg_ndcg_5, avg_ndcg_10 = np.mean(avg_ndcg_5), np.mean(avg_ndcg_10)
+
+        # Directly access variables
+        print(f"Precision@5: {avg_precision_5:>10.6f}       Precision@10: {avg_precision_10:>10.6f}")
+        print(f"Recall@5:    {avg_recall_5:>10.6f}       Recall@10:    {avg_recall_10:>10.6f}")
+        print(f"MAP@5:       {avg_map_5:>10.6f}       MAP@10:       {avg_map_10:>10.6f}")
+        print(f"NDCG@5:      {avg_ndcg_5:>10.6f}       NDCG@10:      {avg_ndcg_10:>10.6f}")
+        print()
+        
 
 if __name__ == '__main__':
     FLAGS = parser.parse_args()
