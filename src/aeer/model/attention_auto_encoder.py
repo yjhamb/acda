@@ -203,17 +203,19 @@ def ndcg_at_k(predictions, actuals, k):
     """
     N = min(len(actuals), k)
     cum_gain = 0
-    ideal_gain = 1
+    ideal_gain = 0
     topk = predictions[-N:]
-    if topk[0] in actuals:
-        cum_gain = 1
     # calculate the ideal gain at k
-    for i in range(2, N):
+    for i in range(1, N):
         ideal_gain += 1 / np.log2(i + 1)
         if topk[i] in actuals:
             cum_gain += 1 / np.log2(i + 1)
 
-    return cum_gain / ideal_gain
+    if ideal_gain != 0:
+        ndcg = cum_gain / ideal_gain
+    else:
+        ndcg = 0
+    return ndcg
 
 def main():
     n_epochs = FLAGS.epochs
@@ -271,8 +273,16 @@ def main():
                 gather_indices = list(zip(range(len(y)), item))
 
                 # Get a batch of data
-                batch_loss, _ = sess.run([model.loss, model.train], {
+                batch_loss, _, outputs = sess.run([model.loss, model.train, model.outputs], {
                     model.x: x.toarray().astype(np.float32),
+                    model.gather_indices: gather_indices,
+                    model.group_id: group_ids,
+                    model.venue_id: venue_ids,
+                    model.y: y,
+                    model.dropout: 0.8
+                })
+                batch_loss, _ = sess.run([model.loss, model.train], {
+                    model.x: outputs,
                     model.gather_indices: gather_indices,
                     model.group_id: group_ids,
                     model.venue_id: venue_ids,
