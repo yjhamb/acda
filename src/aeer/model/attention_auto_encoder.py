@@ -259,12 +259,17 @@ def main():
             # additive gaussian noise or multiplicative mask-out/drop-out noise
             epoch_loss = 0.0
             users = shuffle(users)
+            precision = []
+            recall = []
+            mean_avg_prec = []
+            ndcg = []
+            eval_at = [5, 10]
 
             print("Training the model...")
             for user_id in users:
                 x, y, item = event_data.get_user_train_events(
                                                     user_id, NEG_COUNT, CORRUPT_RATIO)
-
+                train_event_index = event_data.get_user_train_event_index(user_id)
                 group_ids = event_data.get_user_train_groups(user_id)
                 venue_ids = event_data.get_user_train_venues(user_id)
 
@@ -273,7 +278,7 @@ def main():
                 gather_indices = list(zip(range(len(y)), item))
 
                 # Get a batch of data
-                batch_loss, _, outputs = sess.run([model.loss, model.train, model.outputs], {
+                batch_loss, _ = sess.run([model.loss, model.train], {
                     model.x: x.toarray().astype(np.float32),
                     model.gather_indices: gather_indices,
                     model.group_id: group_ids,
@@ -281,15 +286,33 @@ def main():
                     model.y: y,
                     model.dropout: 0.8
                 })
-                batch_loss, _ = sess.run([model.loss, model.train], {
-                    model.x: outputs,
+                score = sess.run(model.outputs, {
+                    model.x: x.toarray().astype(np.float32),
                     model.gather_indices: gather_indices,
                     model.group_id: group_ids,
                     model.venue_id: venue_ids,
                     model.y: y,
                     model.dropout: 0.8
-                })
+                })[0]
                 epoch_loss += batch_loss
+                # Sorted in ascending order, we then take the last values
+                index = np.argsort(score)
+
+                # Number of test instances
+                preck = []
+                recallk = []
+                mapk = []
+                ndcgk = []
+                for k in eval_at:
+                    preck.append(precision_at_k(index, train_event_index, k))
+                    recallk.append(recall_at_k(index, train_event_index, k))
+                    mapk.append(map_at_k(index, train_event_index, k))
+                    ndcgk.append(ndcg_at_k(index, train_event_index, k))
+
+                precision.append(preck)
+                recall.append(recallk)
+                mean_avg_prec.append(mapk)
+                ndcg.append(ndcgk)
             print("Epoch: {:>16}       Loss: {:>10,.6f}".format("%s/%s" % (epoch, n_epochs),
                                                                 epoch_loss))
             print()
@@ -298,6 +321,24 @@ def main():
                 model.decay_learning_rate(sess, 0.5)
                 
             #prev_epoch_loss = epoch_loss
+            avg_precision_5, avg_precision_10 = zip(*precision)
+            avg_precision_5, avg_precision_10 = np.mean(avg_precision_5), np.mean(avg_precision_10)
+
+            avg_recall_5, avg_recall_10 = zip(*recall)
+            avg_recall_5, avg_recall_10 = np.mean(avg_recall_5), np.mean(avg_recall_10)
+
+            avg_map_5, avg_map_10 = zip(*mean_avg_prec)
+            avg_map_5, avg_map_10 = np.mean(avg_map_5), np.mean(avg_map_10)
+
+            avg_ndcg_5, avg_ndcg_10 = zip(*ndcg)
+            avg_ndcg_5, avg_ndcg_10 = np.mean(avg_ndcg_5), np.mean(avg_ndcg_10)
+
+            # Directly access variables
+            print(f"Precision@5: {avg_precision_5:>10.6f}       Precision@10: {avg_precision_10:>10.6f}")
+            print(f"Recall@5:    {avg_recall_5:>10.6f}       Recall@10:    {avg_recall_10:>10.6f}")
+            print(f"MAP@5:       {avg_map_5:>10.6f}       MAP@10:       {avg_map_10:>10.6f}")
+            print(f"NDCG@5:      {avg_ndcg_5:>10.6f}       NDCG@10:      {avg_ndcg_10:>10.6f}")
+            print()
             
             # evaluate the model on the cv set
             cv_users = event_data.get_cv_users()

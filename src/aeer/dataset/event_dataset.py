@@ -81,6 +81,14 @@ class EventData(object):
         """Return the number of venues in the dataset"""
         return self._n_venues
 
+    def get_user_train_event_index(self, user_id):
+        """
+        Get the converted index of user events
+        """
+        unique_user_train_events = self.train_x.eventId[self.train_x.memberId == user_id].unique()
+        return [self._event_class_to_index[i]
+                            for i in unique_user_train_events]
+
     def get_user_test_event_index(self, user_id):
         """
         Get the converted index of user events
