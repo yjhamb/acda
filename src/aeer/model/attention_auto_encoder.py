@@ -292,7 +292,7 @@ def main():
                     model.group_id: group_ids,
                     model.venue_id: venue_ids,
                     model.y: y,
-                    model.dropout: 0.8
+                    model.dropout: 1.0
                 })[0]
                 epoch_loss += batch_loss
                 # Sorted in ascending order, we then take the last values
