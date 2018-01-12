@@ -162,8 +162,7 @@ def precision_at_k(predictions, actuals, k):
     """
     N = len(actuals)
     hits = len(set(predictions[-k:]).intersection(set(actuals)))
-    #precision = hits / min(N, k)
-    precision = hits / k
+    precision = hits / min(N, k)
     return precision
 
 def recall_at_k(predictions, actuals, k):
