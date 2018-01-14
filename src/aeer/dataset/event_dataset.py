@@ -24,9 +24,9 @@ class EventData(object):
         # select rows for users that have >= 5 RSVPs
         self.events = self.events.groupby('memberId').filter(lambda x : len(x) >= 5)
         # sort the event data by event time
-        events_sorted = self.events.sort_values(['eventTime'], ascending=True)
-        x = events_sorted.drop(['rsvpRating'], axis=1)
-        y = events_sorted[['rsvpRating']]
+        # events_sorted = self.events.sort_values(['eventTime'], ascending=True)
+        x = self.events.drop(['rsvpRating'], axis=1)
+        y = self.events[['rsvpRating']]
 
         # perform the train-test split
         self.train_x, self.test_x, self.train_y, self.test_y = ms.train_test_split(x, y, test_size=0.2, random_state=42)
@@ -34,10 +34,20 @@ class EventData(object):
         # split again to generate CV set
         self.train_x, self.cv_x, self.train_y, self.cv_y = ms.train_test_split(self.train_x, self.train_y, test_size=0.25, random_state=42)
 
+        print("Total RSVPs:", len(self.events))
+        print("Train RSVPs:", len(self.train_x))
+        print("CV RSVPs:", len(self.cv_x))
+        print("Test RSVPs:", len(self.test_x))
+        
         self._n_users = len(self.get_users())
         self._n_events = len(self.get_events())
         self._n_groups = len(self.get_groups())
         self._n_venues = len(self.get_venues())
+        
+        print("Total Users:", self._n_users)
+        print("Total Events:", self._n_events)
+        print("Total Groups:", self._n_groups)
+        print("Total Venues:", self._n_venues)
 
         self._user_group_data = ug_dataset.UserGroupData(user_group_file)
 

@@ -222,7 +222,7 @@ def main():
     NEG_COUNT = FLAGS.neg_count
     CORRUPT_RATIO = FLAGS.corrupt
 
-    event_data = ds.EventData(ds.rsvp_chicago_file, ug_dataset.user_group_chicago_file)
+    event_data = ds.EventData(ds.rsvp_ny_file, ug_dataset.user_group_ny_file)
     users = event_data.get_train_users()
 
     n_inputs = event_data.n_events
