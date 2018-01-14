@@ -21,6 +21,8 @@ class EventData(object):
 
     def __init__(self, rsvp_file, user_group_file):
         self.events = pd.read_csv(rsvp_file)
+        # select rows for users that have >= 5 RSVPs
+        self.events = self.events.groupby('memberId').filter(lambda x : len(x) >= 5)
         # sort the event data by event time
         events_sorted = self.events.sort_values(['eventTime'], ascending=True)
         x = events_sorted.drop(['rsvpRating'], axis=1)
