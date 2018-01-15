@@ -25,7 +25,7 @@ class EventData(object):
         #self.events = self.events.groupby('memberId').filter(lambda x : len(x) >= 5)
         # sort the event data by event time
         events_sorted = self.events.sort_values(['eventTime'], ascending=True)
-        x = events_sorted(['rsvpRating'], axis=1)
+        x = events_sorted.drop(['rsvpRating'], axis=1)
         y = events_sorted[['rsvpRating']]
 
         # perform the train-test split
