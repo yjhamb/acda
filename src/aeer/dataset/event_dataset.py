@@ -22,11 +22,11 @@ class EventData(object):
     def __init__(self, rsvp_file, user_group_file):
         self.events = pd.read_csv(rsvp_file)
         # select rows for users that have >= 5 RSVPs
-        self.events = self.events.groupby('memberId').filter(lambda x : len(x) >= 5)
+        #self.events = self.events.groupby('memberId').filter(lambda x : len(x) >= 5)
         # sort the event data by event time
-        # events_sorted = self.events.sort_values(['eventTime'], ascending=True)
-        x = self.events.drop(['rsvpRating'], axis=1)
-        y = self.events[['rsvpRating']]
+        events_sorted = self.events.sort_values(['eventTime'], ascending=True)
+        x = events_sorted(['rsvpRating'], axis=1)
+        y = events_sorted[['rsvpRating']]
 
         # perform the train-test split
         self.train_x, self.test_x, self.train_y, self.test_y = ms.train_test_split(x, y, test_size=0.2, random_state=42)
