@@ -204,12 +204,15 @@ def ndcg_at_k(predictions, actuals, k):
     cum_gain = 0
     ideal_gain = 0
     topk = predictions[-N:]
+    hits = 0
     # calculate the ideal gain at k
-    for i in range(1, N):
-        ideal_gain += 1 / np.log2(i + 1)
+    for i in range(0, N):
         if topk[i] in actuals:
-            cum_gain += 1 / np.log2(i + 1)
-
+            cum_gain += 1 / np.log2(i + 2)
+            hits = hits + 1
+    
+    for i in range(0, hits):
+        ideal_gain += 1 / np.log2(i + 2)
     if ideal_gain != 0:
         ndcg = cum_gain / ideal_gain
     else:
@@ -222,7 +225,7 @@ def main():
     NEG_COUNT = FLAGS.neg_count
     CORRUPT_RATIO = FLAGS.corrupt
 
-    event_data = ds.EventData(ds.rsvp_ny_file, ug_dataset.user_group_ny_file)
+    event_data = ds.EventData(ds.rsvp_chicago_file, ug_dataset.user_group_chicago_file)
     users = event_data.get_train_users()
 
     n_inputs = event_data.n_events
