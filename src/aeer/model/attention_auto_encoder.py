@@ -11,7 +11,7 @@ import tensorflow as tf
 import numpy as np
 from sklearn.utils import shuffle
 
-from aeer.model.utils import ACTIVATION_FN
+from aeer.model.utils import ACTIVATION_FN, set_logging_config
 import aeer.dataset.user_group_dataset as ug_dataset
 
 """
@@ -32,6 +32,7 @@ parser.add_argument('-n', '--neg_count', help='Number of negatives', type=int,
                     default=4)
 parser.add_argument('-c', '--corrupt', help='Corruption ratio', type=float,
                     default=0.1)
+parser.add_argument('--save_dir', help='Directory to save the model; if not set will not save', type=str, default=None)
 # Pass the Flag to disable
 parser.add_argument('--nogroup', help='disable group latent factor', action="store_true")
 parser.add_argument('--novenue', help='disable venue latent factor', action="store_true")
@@ -60,7 +61,7 @@ class AttentionAutoEncoder(object):
         :param n_venues: int, Number of venues or None to disable
         :param learning_rate: float, Step size
         """
-            
+
         self.x = tf.placeholder(tf.float32, shape=[None, n_inputs])
         self.group_id = tf.placeholder(tf.int32, shape=[None])
         self.venue_id = tf.placeholder(tf.int32, shape=[None])
@@ -81,7 +82,7 @@ class AttentionAutoEncoder(object):
         scale = tf.Variable(tf.ones([n_hidden]))
         beta = tf.Variable(tf.zeros([n_hidden]))
         epsilon = 1e-3
-        
+
         preactivation = tf.nn.xw_plus_b(self.x, W, b)
         # perform batch normalization
         u_mean, u_var = tf.nn.moments(preactivation, [0])
@@ -89,7 +90,7 @@ class AttentionAutoEncoder(object):
 
         hidden = ACTIVATION_FN[hidden_activation](preactivation)
         hidden = tf.nn.dropout(hidden, self.dropout)
-        
+
         attention = hidden
         # setup attention mechanism
         # Add venue latent factor
@@ -127,7 +128,7 @@ class AttentionAutoEncoder(object):
             attention += tf.squeeze(group_weighted)
 
         attn_output = tf.nn.softmax(tf.nn.tanh(attention))
-        
+
         # create the output layer
         W2 = tf.get_variable('W2', shape=[n_hidden, n_outputs], regularizer=tf.contrib.layers.l2_regularizer(scale=reg_constant))
         b2 = tf.get_variable('Bias2', shape=[n_outputs])
@@ -141,12 +142,12 @@ class AttentionAutoEncoder(object):
 
         self.targets = tf.gather_nd(self.outputs, self.gather_indices)
         self.actuals = tf.placeholder(tf.int64, shape=[None])
-        
+
         # add weight regularizer
         #reg_losses = tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES)
-        
+
         # square loss
-        #self.loss = tf.losses.mean_squared_error(self.targets, self.y) + sum(reg_losses) 
+        #self.loss = tf.losses.mean_squared_error(self.targets, self.y) + sum(reg_losses)
         self.loss = tf.losses.mean_squared_error(self.targets, self.y)
         optimizer = tf.train.AdamOptimizer(learning_rate)
         # Train Model
@@ -210,7 +211,7 @@ def ndcg_at_k(predictions, actuals, k):
         if topk[i] in actuals:
             cum_gain += 1 / np.log2(i + 2)
             hits = hits + 1
-    
+
     for i in range(0, hits):
         ideal_gain += 1 / np.log2(i + 2)
     if ideal_gain != 0:
@@ -245,17 +246,13 @@ def main():
     model = AttentionAutoEncoder(n_inputs, n_hidden, n_outputs, n_groups, n_venues,
                                     FLAGS.hidden_fn, FLAGS.output_fn,
                                     learning_rate=0.001)
-
-    init = tf.global_variables_initializer()
-    init_local = tf.local_variables_initializer()
-
     tf_config = tf.ConfigProto(
         gpu_options=tf.GPUOptions(per_process_gpu_memory_fraction=0.25,
                                   allow_growth=True))
+    sv = tf.train.Supervisor(logdir=FLAGS.save_dir)
+    set_logging_config(FLAGS.save_dir)
 
-    with tf.Session(config=tf_config) as sess:
-        init.run()
-        init_local.run()
+    with sv.prepare_or_wait_for_session(config=tf_config) as sess:
         prev_epoch_loss = 0.0
         for epoch in range(n_epochs):
             # additive gaussian noise or multiplicative mask-out/drop-out noise
@@ -267,7 +264,7 @@ def main():
             ndcg = []
             eval_at = [5, 10]
 
-            print("Training the model...")
+            tf.logging.info("Training the model...")
             for user_id in users:
                 x, y, item = event_data.get_user_train_events(
                                                     user_id, NEG_COUNT, CORRUPT_RATIO)
@@ -315,13 +312,13 @@ def main():
                 recall.append(recallk)
                 mean_avg_prec.append(mapk)
                 ndcg.append(ndcgk)
-            print("Epoch: {:>16}       Loss: {:>10,.6f}".format("%s/%s" % (epoch, n_epochs),
+            tf.logging.info("Epoch: {:>16}       Loss: {:>10,.6f}".format("%s/%s" % (epoch, n_epochs),
                                                                 epoch_loss))
-            print()
+            tf.logging.info("")
             if prev_epoch_loss != 0 and abs(epoch_loss - prev_epoch_loss) < 1:
-                print("Decaying learning rate...")
+                tf.logging.info("Decaying learning rate...")
                 model.decay_learning_rate(sess, 0.5)
-                
+
             #prev_epoch_loss = epoch_loss
             avg_precision_5, avg_precision_10 = zip(*precision)
             avg_precision_5, avg_precision_10 = np.mean(avg_precision_5), np.mean(avg_precision_10)
@@ -336,12 +333,12 @@ def main():
             avg_ndcg_5, avg_ndcg_10 = np.mean(avg_ndcg_5), np.mean(avg_ndcg_10)
 
             # Directly access variables
-            print(f"Precision@5: {avg_precision_5:>10.6f}       Precision@10: {avg_precision_10:>10.6f}")
-            print(f"Recall@5:    {avg_recall_5:>10.6f}       Recall@10:    {avg_recall_10:>10.6f}")
-            print(f"MAP@5:       {avg_map_5:>10.6f}       MAP@10:       {avg_map_10:>10.6f}")
-            print(f"NDCG@5:      {avg_ndcg_5:>10.6f}       NDCG@10:      {avg_ndcg_10:>10.6f}")
-            print()
-            
+            tf.logging.info(f"Precision@5: {avg_precision_5:>10.6f}       Precision@10: {avg_precision_10:>10.6f}")
+            tf.logging.info(f"Recall@5:    {avg_recall_5:>10.6f}       Recall@10:    {avg_recall_10:>10.6f}")
+            tf.logging.info(f"MAP@5:       {avg_map_5:>10.6f}       MAP@10:       {avg_map_10:>10.6f}")
+            tf.logging.info(f"NDCG@5:      {avg_ndcg_5:>10.6f}       NDCG@10:      {avg_ndcg_10:>10.6f}")
+            tf.logging.info("")
+
             # evaluate the model on the cv set
             cv_users = event_data.get_cv_users()
             precision = []
@@ -350,7 +347,7 @@ def main():
             ndcg = []
             eval_at = [5, 10]
 
-            print("Evaluating on the CV set...")
+            tf.logging.info("Evaluating on the CV set...")
             valid_test_users = 0
             for user_id in cv_users:
                 # check if user was present in training data
@@ -404,14 +401,14 @@ def main():
                 avg_ndcg_5, avg_ndcg_10 = np.mean(avg_ndcg_5), np.mean(avg_ndcg_10)
 
             # Directly access variables
-            print(f"Precision@5: {avg_precision_5:>10.6f}       Precision@10: {avg_precision_10:>10.6f}")
-            print(f"Recall@5:    {avg_recall_5:>10.6f}       Recall@10:    {avg_recall_10:>10.6f}")
-            print(f"MAP@5:       {avg_map_5:>10.6f}       MAP@10:       {avg_map_10:>10.6f}")
-            print(f"NDCG@5:      {avg_ndcg_5:>10.6f}       NDCG@10:      {avg_ndcg_10:>10.6f}")
-            print()
-        
+            tf.logging.info(f"Precision@5: {avg_precision_5:>10.6f}       Precision@10: {avg_precision_10:>10.6f}")
+            tf.logging.info(f"Recall@5:    {avg_recall_5:>10.6f}       Recall@10:    {avg_recall_10:>10.6f}")
+            tf.logging.info(f"MAP@5:       {avg_map_5:>10.6f}       MAP@10:       {avg_map_10:>10.6f}")
+            tf.logging.info(f"NDCG@5:      {avg_ndcg_5:>10.6f}       NDCG@10:      {avg_ndcg_10:>10.6f}")
+            tf.logging.info("")
+
         # evaluate on test users
-        print("Evaluating on the test set...")
+        tf.logging.info("Evaluating on the test set...")
         valid_test_users = 0
         precision = []
         recall = []
@@ -470,12 +467,12 @@ def main():
             avg_ndcg_5, avg_ndcg_10 = np.mean(avg_ndcg_5), np.mean(avg_ndcg_10)
 
         # Directly access variables
-        print(f"Precision@5: {avg_precision_5:>10.6f}       Precision@10: {avg_precision_10:>10.6f}")
-        print(f"Recall@5:    {avg_recall_5:>10.6f}       Recall@10:    {avg_recall_10:>10.6f}")
-        print(f"MAP@5:       {avg_map_5:>10.6f}       MAP@10:       {avg_map_10:>10.6f}")
-        print(f"NDCG@5:      {avg_ndcg_5:>10.6f}       NDCG@10:      {avg_ndcg_10:>10.6f}")
-        print()
-        
+        tf.logging.info(f"Precision@5: {avg_precision_5:>10.6f}       Precision@10: {avg_precision_10:>10.6f}")
+        tf.logging.info(f"Recall@5:    {avg_recall_5:>10.6f}       Recall@10:    {avg_recall_10:>10.6f}")
+        tf.logging.info(f"MAP@5:       {avg_map_5:>10.6f}       MAP@10:       {avg_map_10:>10.6f}")
+        tf.logging.info(f"NDCG@5:      {avg_ndcg_5:>10.6f}       NDCG@10:      {avg_ndcg_10:>10.6f}")
+        tf.logging.info("")
+    sv.request_stop()
 
 if __name__ == '__main__':
     FLAGS = parser.parse_args()
