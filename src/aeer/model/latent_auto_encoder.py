@@ -189,17 +189,22 @@ def ndcg_at_k(predictions, actuals, k):
     """
     N = min(len(actuals), k)
     cum_gain = 0
-    ideal_gain = 1
+    ideal_gain = 0
     topk = predictions[-N:]
-    if topk[0] in actuals:
-        cum_gain = 1
+    hits = 0
     # calculate the ideal gain at k
-    for i in range(2, N):
-        ideal_gain += 1 / np.log2(i)
+    for i in range(0, N):
         if topk[i] in actuals:
-            cum_gain += 1 / np.log2(i)
+            cum_gain += 1 / np.log2(i + 2)
+            hits = hits + 1
 
-    return cum_gain / ideal_gain
+    for i in range(0, hits):
+        ideal_gain += 1 / np.log2(i + 2)
+    if ideal_gain != 0:
+        ndcg = cum_gain / ideal_gain
+    else:
+        ndcg = 0
+    return ndcg
 
 def main():
     n_epochs = FLAGS.epochs
