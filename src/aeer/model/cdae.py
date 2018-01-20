@@ -48,7 +48,7 @@ parser.add_argument('--output_fn',
 
 class CDAEAutoEncoder(object):
 
-    def __init__(self, n_inputs, n_hidden, n_outputs, n_groups, n_venues, n_users,
+    def __init__(self, n_inputs, n_hidden, n_outputs, n_users,
                  hidden_activation='relu', output_activation='sigmoid',
                  learning_rate=0.001):
         """
@@ -56,8 +56,7 @@ class CDAEAutoEncoder(object):
         :param n_inputs: int, Number of input features (number of events)
         :param n_hidden: int, Number of hidden units
         :param n_outputs: int, Number of output features (number of events)
-        :param n_groups: int, Number of groups or None to disable
-        :param n_venues: int, Number of venues or None to disable
+        :param n_users: int, Number of users or None to disable
         :param learning_rate: float, Step size
         """
 
@@ -77,18 +76,11 @@ class CDAEAutoEncoder(object):
 
         # Uniform Initialization U(-eps, eps)
         eps = 0.01
-        scale = tf.Variable(tf.ones([n_hidden]))
-        beta = tf.Variable(tf.zeros([n_hidden]))
-        epsilon = 1e-3
 
         preactivation = tf.nn.xw_plus_b(self.x, W, b)
-        # perform batch normalization
-        u_mean, u_var = tf.nn.moments(preactivation, [0])
-        #preactivation = tf.nn.batch_normalization(preactivation, u_mean, u_var, beta, scale, epsilon)
 
         hidden = ACTIVATION_FN[hidden_activation](preactivation)
-        #hidden = tf.nn.dropout(hidden, self.dropout)
-
+        hidden = tf.nn.dropout(hidden, self.dropout)
         attention = hidden
         
         # Create and lookup each bias
@@ -102,29 +94,18 @@ class CDAEAutoEncoder(object):
         # Weighted sum of user factors
         user_weighted = tf.reduce_sum(u_attn_weight * self.user_factor,
                                   axis=0)
-        # Sum all venue factors, then make it a vector so it will broadcast
-        # and add it to all instances
         attention += tf.squeeze(user_weighted)
         
         # create the output layer
         W2 = tf.get_variable('W2', shape=[n_hidden, n_outputs], regularizer=tf.contrib.layers.l2_regularizer(scale=reg_constant))
         b2 = tf.get_variable('Bias2', shape=[n_outputs])
         preactivation_output = tf.nn.xw_plus_b(tf.multiply(attention, hidden), W2, b2)
-        # perform batch normalization
-        scale = tf.Variable(tf.ones([n_outputs]))
-        beta = tf.Variable(tf.zeros([n_outputs]))
-        u_mean, u_var = tf.nn.moments(preactivation_output, [0])
-        #preactivation_output = tf.nn.batch_normalization(preactivation_output, u_mean, u_var, beta, scale, epsilon)
         self.outputs = ACTIVATION_FN[output_activation](preactivation_output)
 
         self.targets = tf.gather_nd(self.outputs, self.gather_indices)
         self.actuals = tf.placeholder(tf.int64, shape=[None])
 
-        # add weight regularizer
-        #reg_losses = tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES)
-
         # square loss
-        #self.loss = tf.losses.mean_squared_error(self.targets, self.y) + sum(reg_losses)
         self.loss = tf.losses.mean_squared_error(self.targets, self.y)
         optimizer = tf.train.AdamOptimizer(learning_rate)
         # Train Model
@@ -207,21 +188,10 @@ def main():
     users = event_data.get_train_users()
 
     n_inputs = event_data.n_events
-    n_groups = event_data.n_groups
     n_users = event_data.n_users
     n_outputs = event_data.n_events
-    n_venues = event_data.n_venues
 
-    # We set to None to turn off the group/venue latent factors
-    if FLAGS.nogroup:
-        print("Disabling Group Latent Factor")
-        n_groups = None
-
-    if FLAGS.novenue:
-        print("Disabling Venue Latent Factor")
-        n_venues = None
-
-    model = CDAEAutoEncoder(n_inputs, n_hidden, n_outputs, n_groups, n_venues, n_users,
+    model = CDAEAutoEncoder(n_inputs, n_hidden, n_outputs, n_users,
                                     FLAGS.hidden_fn, FLAGS.output_fn,
                                     learning_rate=0.001)
     tf_config = tf.ConfigProto(
@@ -247,8 +217,7 @@ def main():
                 x, y, item = event_data.get_user_train_events(
                                                     user_id, NEG_COUNT, CORRUPT_RATIO)
                 train_event_index = event_data.get_user_train_event_index(user_id)
-                group_ids = event_data.get_user_train_groups(user_id)
-                venue_ids = event_data.get_user_train_venues(user_id)
+                user_index = event_data.get_user_index(user_id)
 
                 # We only compute loss on events we used as inputs
                 # Each row is to index the first dimension
@@ -258,14 +227,14 @@ def main():
                 batch_loss, _ = sess.run([model.loss, model.train], {
                     model.x: x.toarray().astype(np.float32),
                     model.gather_indices: gather_indices,
-                    model.user_id: [user_id],
+                    model.user_id: user_index,
                     model.y: y,
                     model.dropout: 0.8
                 })
                 score = sess.run(model.outputs, {
                     model.x: x.toarray().astype(np.float32),
                     model.gather_indices: gather_indices,
-                    model.user_id: [user_id],
+                    model.user_id: user_index,
                     model.y: y,
                     model.dropout: 1.0
                 })[0]
@@ -333,12 +302,11 @@ def main():
                     test_event_index = event_data.get_user_cv_event_index(user_id)
 
                     x, _, _ = event_data.get_user_train_events(user_id, 0, 0)
-                    group_ids = event_data.get_user_train_groups(user_id)
-                    venue_ids = event_data.get_user_train_venues(user_id)
+                    user_index = event_data.get_user_index(user_id)
                     # Compute score
                     score = sess.run(model.outputs, {
                         model.x: x.toarray().astype(np.float32),
-                        model.user_id: [user_id],
+                        model.user_id: user_index,
                         model.dropout: 1.0
                     })[0] # We only do one sample at a time, take 0 index
 
@@ -398,12 +366,11 @@ def main():
                 test_event_index = event_data.get_user_test_event_index(user_id)
 
                 x, _, _ = event_data.get_user_train_events(user_id, 0, 0)
-                group_ids = event_data.get_user_train_groups(user_id)
-                venue_ids = event_data.get_user_train_venues(user_id)
+                user_index = event_data.get_user_index(user_id)
                 # Compute score
                 score = sess.run(model.outputs, {
                     model.x: x.toarray().astype(np.float32),
-                    model.user_id: [user_id],
+                    model.user_id: user_index,
                     model.dropout: 1.0
                 })[0] # We only do one sample at a time, take 0 index
 
