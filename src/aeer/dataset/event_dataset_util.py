@@ -60,19 +60,20 @@ def generate_librec_rating_file():
 
 def print_rsvp_data(file_name):
     events = pd.read_csv(file_name)
-    print(len(events))
-    print(len(events['memberId'].unique()))
-    print(len(events['eventId'].unique()))
-    events = events.groupby('memberId').filter(lambda x : len(x) >= 5)
-    print(len(events))
-    print(len(events['memberId'].unique()))
-    print(len(events['eventId'].unique()))
+    print("Total RSVPs", len(events))
+    print("Users:", len(events['memberId'].unique()))
+    print("Events:", len(events['eventId'].unique()))
+    print("Groups:", len(events['groupId'].unique()))
+    print("Venues:", len(events['venueId'].unique()))
+    print("Positive RSVPs:", len(events[events['rsvpRating'] == 1]))
+    print("Negative RSVPs:", len(events[events['rsvpRating'] == 0]))
+    #events = events.groupby('memberId').filter(lambda x : len(x) >= 5)
 
 def main():
     print("Main method")
     #perform_train_test_split()
-    generate_librec_rating_file()
-    #print_rsvp_data(ny_file_name)
+    #generate_librec_rating_file()
+    print_rsvp_data(chicago_file_name)
 
 if __name__ == '__main__':
     main()
