@@ -16,9 +16,9 @@ class MovieRatingsData(object):
 
     def __init__(self):
         self.ratings = pd.read_csv(RATINGS_CONTEXT_FILE)
-
+        ratings_sorted = self.ratings.sort_values(['timestamp'], ascending=True)
         # perform the train-test split
-        self.train_ratings, self.test_ratings = ms.train_test_split(self.ratings, test_size=0.2, random_state=42)
+        self.train_ratings, self.test_ratings = ms.train_test_split(ratings_sorted, test_size=0.2, random_state=42)
 
         # split again to generate CV set
         self.train_ratings, self.cv_ratings = ms.train_test_split(self.train_ratings, test_size=0.25, random_state=42)
