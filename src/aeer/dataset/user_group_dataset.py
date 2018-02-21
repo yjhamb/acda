@@ -4,10 +4,10 @@ Functions that operate on the user-group association dataset
 
 import pandas as pd
 
-user_group_ny_file = "../../../dataset/user_group_ny.csv"
-user_group_sfo_file = "../../../dataset/user_group_sfo.csv"
-user_group_dc_file = "../../../dataset/user_group_dc.csv"
-user_group_chicago_file = "../../../dataset/user_group_chicago.csv"
+user_group_ny_file = "../../../dataset/meetup/user_group_ny.csv"
+user_group_sfo_file = "../../../dataset/meetup/user_group_sfo.csv"
+user_group_dc_file = "../../../dataset/meetup/user_group_dc.csv"
+user_group_chicago_file = "../../../dataset/meetup/user_group_chicago.csv"
 
 class UserGroupData(object):
 
