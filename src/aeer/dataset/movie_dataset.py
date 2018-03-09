@@ -126,13 +126,15 @@ class MovieRatingsData(object):
         Get train user genre indexes
         """
         genre_set = set()
-        genres_list = self.train_ratings[self.train_ratings.userId == user_id].genres
+        genres_list = self.train_ratings[(self.train_ratings.userId == user_id) & (self.train_ratings.rating >= 4)].genres
         for genre in genres_list:
             split_genre = genre.split('|')
             for g in split_genre:
                 genre_set.add(g)
-        
-        return self._genre_encoder.transform(list(genre_set))
+        if not genre_set:
+            return []
+        else:
+            return self._genre_encoder.transform(list(genre_set))
 
     def get_user_unique_test_movies(self, user_id):
         return self.test_ratings.movieId[self.test_ratings.userId == user_id].unique()

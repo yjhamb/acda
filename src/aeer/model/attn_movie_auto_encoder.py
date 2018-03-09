@@ -30,7 +30,7 @@ parser.add_argument('-s', '--size', help='Number of hidden layer',
 parser.add_argument('-n', '--neg_count', help='Number of negatives', type=int,
                     default=4)
 parser.add_argument('-c', '--corrupt', help='Corruption ratio', type=float,
-                    default=0.1)
+                    default=0.2)
 parser.add_argument('--save_dir', help='Directory to save the model; if not set will not save', type=str, default=None)
 # Pass the Flag to disable
 parser.add_argument('--nogenre', help='disable genre latent factor', action="store_true")
