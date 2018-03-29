@@ -24,13 +24,13 @@ python attention_auto_encoder.py --nogroup
 """
 parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument('-g', '--gpu', help='set gpu device number 0-3', type=str, default='3')
-parser.add_argument('-e', '--epochs', help='Number of epochs', type=int, default=5)
+parser.add_argument('-e', '--epochs', help='Number of epochs', type=int, default=25)
 parser.add_argument('-s', '--size', help='Number of hidden layer',
-                    type=int, default=100)
+                    type=int, default=500)
 parser.add_argument('-n', '--neg_count', help='Number of negatives', type=int,
-                    default=4)
+                    default=5)
 parser.add_argument('-c', '--corrupt', help='Corruption ratio', type=float,
-                    default=0.1)
+                    default=0.2)
 parser.add_argument('--save_dir', help='Directory to save the model; if not set will not save', type=str, default=None)
 # Pass the Flag to disable
 parser.add_argument('--nogenre', help='disable genre latent factor', action="store_true")

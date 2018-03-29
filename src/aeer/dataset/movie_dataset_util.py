@@ -7,6 +7,7 @@ import sklearn.model_selection as ms
 
 RATINGS_FILE = "../../../dataset/movielens/ratings.csv"
 RATINGS_CONTEXT_FILE = "../../../dataset/movielens/rating_context.csv"
+RATINGS_SCORE_CONTEXT_FILE = "../../../dataset/movielens/rating_score_context.csv"
 MOVIES_FILE = "../../../dataset/movielens/movies.csv"
 TAGS_FILE = "../../../dataset/movielens/tags.csv"
 
@@ -16,11 +17,19 @@ def generate_movie_dataset():
     ratings_context = pd.merge(ratings, movies, on='movieId', how='left')
     ratings_context.to_csv(RATINGS_CONTEXT_FILE, index=False)
     
+def update_movie_dataset():
+    ratings = pd.read_csv(RATINGS_SCORE_CONTEXT_FILE)
+    ratings.loc[ratings['score'] >= 4.0, 'rating'] = 1
+    ratings.loc[ratings['score'] < 4.0, 'rating'] = 0
+    ratings.to_csv(RATINGS_CONTEXT_FILE, index=False)
+    
 def perform_train_test_split():
     RATINGS_TRAIN_FILE = "../../../dataset/movielens/ratings_train.csv"
     RATINGS_TEST_FILE = "../../../dataset/movielens/ratings_test.csv"
     
     ratings = pd.read_csv(RATINGS_FILE)
+    ratings.loc[ratings['score'] >= 4.0, 'rating'] = 1
+    ratings.loc[ratings['score'] < 4.0, 'rating'] = 0
     ratings_sorted = ratings.sort_values(['timestamp'], ascending=True)
     # perform the train-test split
     train_ratings, test_ratings = ms.train_test_split(ratings_sorted, test_size=0.2, random_state=42)

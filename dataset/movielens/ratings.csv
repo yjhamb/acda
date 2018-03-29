@@ -1,4 +1,4 @@
-userId,movieId,rating,timestamp
+userId,movieId,score,timestamp
 1,31,2.5,1260759144
 1,1029,3.0,1260759179
 1,1061,3.0,1260759182
