@@ -168,7 +168,7 @@ class MovieRatingsData(object):
         :returns: Encoded User Vector, Y Target, item ids
         """
         # Get positive samples
-        positives = df.movieId[(df.userId == user_id) & (df.rating >=3)].unique().tolist()
+        positives = df.movieId[(df.userId == user_id) & (df.rating == 1)].unique().tolist()
 
         # Testing...
         if negative_count == 0:

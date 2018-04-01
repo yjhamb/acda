@@ -19,8 +19,8 @@ def generate_movie_dataset():
     
 def update_movie_dataset():
     ratings = pd.read_csv(RATINGS_SCORE_CONTEXT_FILE)
-    ratings.loc[ratings['score'] >= 4.0, 'rating'] = 1
-    ratings.loc[ratings['score'] < 4.0, 'rating'] = 0
+    ratings.loc[ratings['score'] >= 5.0, 'rating'] = 1
+    ratings.loc[ratings['score'] < 5.0, 'rating'] = 0
     ratings.to_csv(RATINGS_CONTEXT_FILE, index=False)
     
 def perform_train_test_split():
@@ -28,8 +28,8 @@ def perform_train_test_split():
     RATINGS_TEST_FILE = "../../../dataset/movielens/ratings_test.csv"
     
     ratings = pd.read_csv(RATINGS_FILE)
-    ratings.loc[ratings['score'] >= 4.0, 'rating'] = 1
-    ratings.loc[ratings['score'] < 4.0, 'rating'] = 0
+    ratings.loc[ratings['score'] >= 5.0, 'rating'] = 1
+    ratings.loc[ratings['score'] < 5.0, 'rating'] = 0
     ratings_sorted = ratings.sort_values(['timestamp'], ascending=True)
     # perform the train-test split
     train_ratings, test_ratings = ms.train_test_split(ratings_sorted, test_size=0.2, random_state=42)
@@ -57,8 +57,7 @@ def generate_librec_rating_file():
 
 def main():
     print("Main method")
-    #generate_movie_dataset()
-    perform_train_test_split()
+    update_movie_dataset()
     print("Main method complete")
 
 if __name__ == '__main__':
