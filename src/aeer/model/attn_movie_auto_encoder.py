@@ -24,7 +24,7 @@ python attention_auto_encoder.py --nogroup
 """
 parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument('-g', '--gpu', help='set gpu device number 0-3', type=str, default='3')
-parser.add_argument('-e', '--epochs', help='Number of epochs', type=int, default=25)
+parser.add_argument('-e', '--epochs', help='Number of epochs', type=int, default=5)
 parser.add_argument('-s', '--size', help='Number of hidden layer',
                     type=int, default=500)
 parser.add_argument('-n', '--neg_count', help='Number of negatives', type=int,
@@ -231,15 +231,16 @@ def main():
                 # Each row is to index the first dimension
                 gather_indices = list(zip(range(len(y)), item))
 
-                # Get a batch of data
-                batch_loss, _ = sess.run([model.loss, model.train], {
-                    model.x: x.toarray().astype(np.float32),
-                    model.gather_indices: gather_indices,
-                    model.genre_id: genre_ids,
-                    model.y: y,
-                    model.dropout: 0.8
-                })
-                epoch_loss += batch_loss
+                if len(x.data) != 0:
+                    # Get a batch of data
+                    batch_loss, _ = sess.run([model.loss, model.train], {
+                        model.x: x.toarray().astype(np.float32),
+                        model.gather_indices: gather_indices,
+                        model.genre_id: genre_ids,
+                        model.y: y,
+                        model.dropout: 0.6
+                    })
+                    epoch_loss += batch_loss
             tf.logging.info("Epoch: {:>16}       Loss: {:>10,.6f}".format("%s/%s" % (epoch, n_epochs),
                                                                 epoch_loss))
             tf.logging.info("")
