@@ -103,6 +103,7 @@ class AttentionMovieAutoEncoder(object):
         W2 = tf.get_variable('W2', shape=[n_hidden, n_outputs], regularizer=tf.contrib.layers.l2_regularizer(scale=reg_constant))
         b2 = tf.get_variable('Bias2', shape=[n_outputs])
         preactivation_output = tf.nn.xw_plus_b(tf.multiply(attn_output, hidden), W2, b2)
+        preactivation_output = tf.nn.dropout(preactivation_output, self.dropout)
         self.outputs = ACTIVATION_FN[output_activation](preactivation_output)
 
         self.targets = tf.gather_nd(self.outputs, self.gather_indices)
@@ -313,7 +314,7 @@ def main():
         tf.logging.info(f"MAP@5:       {avg_map_5:>10.6f}       MAP@10:       {avg_map_10:>10.6f}")
         tf.logging.info(f"NDCG@5:      {avg_ndcg_5:>10.6f}       NDCG@10:      {avg_ndcg_10:>10.6f}")
         tf.logging.info("")
-        
+
         # evaluate on test users
         tf.logging.info("Evaluating on the test set...")
         valid_test_users = 0
