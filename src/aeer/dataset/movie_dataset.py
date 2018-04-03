@@ -126,7 +126,7 @@ class MovieRatingsData(object):
         Get train user genre indexes
         """
         genre_set = set()
-        genres_list = self.train_ratings[(self.train_ratings.userId == user_id) & (self.train_ratings.rating >=4)].genres
+        genres_list = self.train_ratings[(self.train_ratings.userId == user_id) & (self.train_ratings.rating == 1)].genres
         for genre in genres_list:
             split_genre = genre.split('|')
             for g in split_genre:
