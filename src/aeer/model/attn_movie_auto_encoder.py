@@ -24,7 +24,7 @@ python attention_auto_encoder.py --nogroup
 """
 parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument('-g', '--gpu', help='set gpu device number 0-3', type=str, default='3')
-parser.add_argument('-e', '--epochs', help='Number of epochs', type=int, default=5)
+parser.add_argument('-e', '--epochs', help='Number of epochs', type=int, default=10)
 parser.add_argument('-s', '--size', help='Number of hidden layer',
                     type=int, default=500)
 parser.add_argument('-n', '--neg_count', help='Number of negatives', type=int,
@@ -109,8 +109,13 @@ class AttentionMovieAutoEncoder(object):
         self.targets = tf.gather_nd(self.outputs, self.gather_indices)
         self.actuals = tf.placeholder(tf.int64, shape=[None])
 
+        # add weight regularizer
+        reg_losses = tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES)
+
         # square loss
-        self.loss = tf.losses.mean_squared_error(self.targets, self.y)
+        self.loss = tf.losses.mean_squared_error(self.targets, self.y) + sum(reg_losses)
+        # square loss
+        #self.loss = tf.losses.mean_squared_error(self.targets, self.y)
         optimizer = tf.train.AdamOptimizer(learning_rate)
         # Train Model
         self.train = optimizer.minimize(self.loss)
