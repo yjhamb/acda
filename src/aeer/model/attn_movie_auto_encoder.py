@@ -28,7 +28,7 @@ parser.add_argument('-e', '--epochs', help='Number of epochs', type=int, default
 parser.add_argument('-s', '--size', help='Number of hidden layer',
                     type=int, default=500)
 parser.add_argument('-n', '--neg_count', help='Number of negatives', type=int,
-                    default=5)
+                    default=1)
 parser.add_argument('-c', '--corrupt', help='Corruption ratio', type=float,
                     default=0.2)
 parser.add_argument('--save_dir', help='Directory to save the model; if not set will not save', type=str, default=None)
@@ -110,12 +110,12 @@ class AttentionMovieAutoEncoder(object):
         self.actuals = tf.placeholder(tf.int64, shape=[None])
 
         # add weight regularizer
-        reg_losses = tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES)
+        #reg_losses = tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES)
 
         # square loss
-        self.loss = tf.losses.mean_squared_error(self.targets, self.y) + sum(reg_losses)
+        #self.loss = tf.losses.mean_squared_error(self.targets, self.y) + sum(reg_losses)
         # square loss
-        #self.loss = tf.losses.mean_squared_error(self.targets, self.y)
+        self.loss = tf.losses.mean_squared_error(self.targets, self.y)
         optimizer = tf.train.AdamOptimizer(learning_rate)
         # Train Model
         self.train = optimizer.minimize(self.loss)
@@ -247,12 +247,58 @@ def main():
                         model.dropout: 0.6
                     })
                     epoch_loss += batch_loss
+                    score = sess.run(model.outputs, {
+                        model.x: x.toarray().astype(np.float32),
+                        model.gather_indices: gather_indices,
+                        model.genre_id: genre_ids,
+                        model.y: y,
+                        model.dropout: 1.0
+                        })[0]
+                    # Sorted in ascending order, we then take the last values
+                    index = np.argsort(score)
+    
+                    # Number of test instances
+                    preck = []
+                    recallk = []
+                    mapk = []
+                    ndcgk = []
+                    for k in eval_at:
+                        preck.append(precision_at_k(index, train_movie_index, k))
+                        recallk.append(recall_at_k(index, train_movie_index, k))
+                        mapk.append(map_at_k(index, train_movie_index, k))
+                        ndcgk.append(ndcg_at_k(index, train_movie_index, k))
+    
+                    precision.append(preck)
+                    recall.append(recallk)
+                    mean_avg_prec.append(mapk)
+                    ndcg.append(ndcgk)
+                    
             tf.logging.info("Epoch: {:>16}       Loss: {:>10,.6f}".format("%s/%s" % (epoch, n_epochs),
                                                                 epoch_loss))
             tf.logging.info("")
             if prev_epoch_loss != 0 and abs(epoch_loss - prev_epoch_loss) < 1:
                 tf.logging.info("Decaying learning rate...")
                 model.decay_learning_rate(sess, 0.5)
+            
+            #prev_epoch_loss = epoch_loss
+            avg_precision_5, avg_precision_10 = zip(*precision)
+            avg_precision_5, avg_precision_10 = np.mean(avg_precision_5), np.mean(avg_precision_10)
+
+            avg_recall_5, avg_recall_10 = zip(*recall)
+            avg_recall_5, avg_recall_10 = np.mean(avg_recall_5), np.mean(avg_recall_10)
+
+            avg_map_5, avg_map_10 = zip(*mean_avg_prec)
+            avg_map_5, avg_map_10 = np.mean(avg_map_5), np.mean(avg_map_10)
+
+            avg_ndcg_5, avg_ndcg_10 = zip(*ndcg)
+            avg_ndcg_5, avg_ndcg_10 = np.mean(avg_ndcg_5), np.mean(avg_ndcg_10)
+
+            # Directly access variables
+            tf.logging.info(f"Precision@5: {avg_precision_5:>10.6f}       Precision@10: {avg_precision_10:>10.6f}")
+            tf.logging.info(f"Recall@5:    {avg_recall_5:>10.6f}       Recall@10:    {avg_recall_10:>10.6f}")
+            tf.logging.info(f"MAP@5:       {avg_map_5:>10.6f}       MAP@10:       {avg_map_10:>10.6f}")
+            tf.logging.info(f"NDCG@5:      {avg_ndcg_5:>10.6f}       NDCG@10:      {avg_ndcg_10:>10.6f}")
+            tf.logging.info("")
 
         # evaluate the model on the cv set
         cv_users = ratings_data.get_cv_users()
