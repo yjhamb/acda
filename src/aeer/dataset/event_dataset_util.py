@@ -25,10 +25,10 @@ def update_rsvp_data(file_name):
     events.to_csv(dc_file_name_new, index=False)
 
 def perform_train_test_split():
-    rsvp_file = "../../../dataset/rsvp_chicago.csv"
-    train_file = "../../../dataset/rsvp_chicago_train.csv"
+    rsvp_file = "../../../dataset/meetup/rsvp_ny.csv"
+    train_file = "../../../dataset/meetup/rsvp_ny_train.csv"
     #cv_file = "../../../dataset/rsvp_ny_cv.csv"
-    test_file = "../../../dataset/rsvp_chicago_test.csv"
+    test_file = "../../../dataset/meetup/rsvp_ny_test.csv"
     
     events = pd.read_csv(rsvp_file)
     events_sorted = events.sort_values(['eventTime'], ascending=True)
@@ -37,17 +37,17 @@ def perform_train_test_split():
     train_events, test_events = ms.train_test_split(events_sorted, test_size=0.2, random_state=42)
 
     # split again to generate CV set
-    #train_events, cv_events = ms.train_test_split(train_events, test_size=0.25, random_state=42)
+    train_events, cv_events = ms.train_test_split(train_events, test_size=0.25, random_state=42)
         
     train_events.to_csv(train_file, index=False)
     #cv_events.to_csv(cv_file, index=False)
     test_events.to_csv(test_file, index=False)
 
 def generate_librec_rating_file():
-    train_file = "../../../dataset/rsvp_chicago_train.csv"
-    train_rating_file = "../../../dataset/rsvp_chicago_train_rating.csv"
-    test_file = "../../../dataset/rsvp_chicago_test.csv"
-    test_rating_file = "../../../dataset/rsvp_chicago_test_rating.csv"
+    train_file = "../../../dataset/meetup/rsvp_ny_train.csv"
+    train_rating_file = "../../../dataset/meetup/rsvp_ny_train_rating.csv"
+    test_file = "../../../dataset/meetup/rsvp_ny_test.csv"
+    test_rating_file = "../../../dataset/meetup/rsvp_ny_test_rating.csv"
     
     train_events = pd.read_csv(train_file)
     train_events_ratings = train_events[['memberId', 'eventId', 'rsvpRating']]
@@ -72,8 +72,9 @@ def print_rsvp_data(file_name):
 def main():
     print("Main method")
     #perform_train_test_split()
-    #generate_librec_rating_file()
-    print_rsvp_data(chicago_file_name)
+    generate_librec_rating_file()
+    #print_rsvp_data(chicago_file_name)
+    print("Main method Complete")
 
 if __name__ == '__main__':
     main()

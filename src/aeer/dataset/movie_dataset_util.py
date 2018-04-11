@@ -33,6 +33,8 @@ def perform_train_test_split():
     ratings_sorted = ratings.sort_values(['timestamp'], ascending=True)
     # perform the train-test split
     train_ratings, test_ratings = ms.train_test_split(ratings_sorted, test_size=0.2, random_state=42)
+    # split again to generate CV set
+    train_ratings, cv_ratings = ms.train_test_split(train_ratings, test_size=0.25, random_state=42)
     train_ratings_set = train_ratings[['userId', 'movieId', 'rating']]
     test_ratings_set = test_ratings[['userId', 'movieId', 'rating']]
 
@@ -57,7 +59,7 @@ def generate_librec_rating_file():
 
 def main():
     print("Main method")
-    update_movie_dataset()
+    perform_train_test_split()
     print("Main method complete")
 
 if __name__ == '__main__':
