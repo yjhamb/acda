@@ -28,7 +28,7 @@ parser.add_argument('-e', '--epochs', help='Number of epochs', type=int, default
 parser.add_argument('-s', '--size', help='Number of hidden layer',
                     type=int, default=500)
 parser.add_argument('-n', '--neg_count', help='Number of negatives', type=int,
-                    default=5)
+                    default=1)
 parser.add_argument('-c', '--corrupt', help='Corruption ratio', type=float,
                     default=0.2)
 parser.add_argument('--save_dir', help='Directory to save the model; if not set will not save', type=str, default=None)
@@ -115,10 +115,10 @@ class AttentionMovieAutoEncoder(object):
         # square loss
         #self.loss = tf.losses.mean_squared_error(self.targets, self.y) + sum(reg_losses)
         # square loss
-        #self.loss = tf.losses.mean_squared_error(self.targets, self.y)
-        self.loss = tf.losses.sigmoid_cross_entropy(self.targets, self.y)
-        #optimizer = tf.train.AdamOptimizer(learning_rate)
-        optimizer = tf.train.RMSPropOptimizer(learning_rate)
+        self.loss = tf.losses.mean_squared_error(self.targets, self.y)
+        #self.loss = tf.losses.sigmoid_cross_entropy(self.targets, self.y)
+        optimizer = tf.train.AdamOptimizer(learning_rate)
+        #optimizer = tf.train.RMSPropOptimizer(learning_rate)
         # Train Model
         self.train = optimizer.minimize(self.loss)
 
@@ -132,7 +132,10 @@ def precision_at_k(predictions, actuals, k):
     """
     N = len(actuals)
     hits = len(set(predictions[-k:]).intersection(set(actuals)))
-    precision = hits / min(N, k)
+    if N != 0:
+        precision = hits / min(N, k)
+    else:
+        precision = 0
     return precision
 
 def recall_at_k(predictions, actuals, k):
@@ -145,7 +148,10 @@ def recall_at_k(predictions, actuals, k):
     """
     N = len(actuals)
     hits = len(set(predictions[-k:]).intersection(set(actuals)))
-    recall = hits / N
+    if N != 0:
+        recall = hits / N
+    else:
+        recall = 0
     return recall
 
 def map_at_k(predictions, actuals, k):

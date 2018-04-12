@@ -64,7 +64,8 @@ class MovieRatingsData(object):
         """
         Get the converted index of user movies
         """
-        unique_user_train_movies = self.train_ratings.movieId[self.train_ratings.userId == user_id].unique()
+        unique_user_train_movies = self.train_ratings.movieId[(self.train_ratings.userId == user_id) 
+                                                              & (self.train_ratings.rating == 1)].unique()
         return [self._movie_class_to_index[i]
                             for i in unique_user_train_movies]
 
@@ -72,7 +73,8 @@ class MovieRatingsData(object):
         """
         Get the converted index of user movies
         """
-        unique_user_test_movies = self.test_ratings.movieId[self.test_ratings.userId == user_id].unique()
+        unique_user_test_movies = self.test_ratings.movieId[(self.test_ratings.userId == user_id)
+                                                            & (self.test_ratings.rating == 1)].unique()
         return [self._movie_class_to_index[i]
                             for i in unique_user_test_movies]
 
@@ -80,7 +82,8 @@ class MovieRatingsData(object):
         """
         Get the converted index of user events
         """
-        unique_user_cv_movies = self.cv_ratings.movieId[self.cv_ratings.userId == user_id].unique()
+        unique_user_cv_movies = self.cv_ratings.movieId[(self.cv_ratings.userId == user_id)
+                                                        & (self.cv_ratings.rating == 1)].unique()
         return [self._movie_class_to_index[i]
                             for i in unique_user_cv_movies]
     
