@@ -69,12 +69,12 @@ class AttentionMovieAutoEncoder(object):
         self.dropout = tf.placeholder_with_default(1.0, shape=(), name='Dropout')
 
         reg_constant = 0.01
+        eps = 0.01
         # Weights
         W = tf.get_variable('W', shape=[n_inputs, n_hidden], regularizer=tf.contrib.layers.l2_regularizer(scale=reg_constant))
-        b = tf.get_variable('Bias', shape=[n_hidden])
+        b = tf.get_variable('Bias', shape=[n_hidden], initializer=tf.zeros_initializer(tf.float32))
 
         # Uniform Initialization U(-eps, eps)
-        eps = 0.01
         preactivation = tf.nn.xw_plus_b(self.x, W, b)
         hidden = ACTIVATION_FN[hidden_activation](preactivation)
         hidden = tf.nn.dropout(hidden, self.dropout)
@@ -101,7 +101,7 @@ class AttentionMovieAutoEncoder(object):
 
         # create the output layer
         W2 = tf.get_variable('W2', shape=[n_hidden, n_outputs], regularizer=tf.contrib.layers.l2_regularizer(scale=reg_constant))
-        b2 = tf.get_variable('Bias2', shape=[n_outputs])
+        b2 = tf.get_variable('Bias2', shape=[n_outputs], initializer=tf.zeros_initializer(tf.float32))
         preactivation_output = tf.nn.xw_plus_b(tf.multiply(attn_output, hidden), W2, b2)
         preactivation_output = tf.nn.dropout(preactivation_output, self.dropout)
         self.outputs = ACTIVATION_FN[output_activation](preactivation_output)
@@ -131,11 +131,10 @@ def precision_at_k(predictions, actuals, k):
     :returns precision: float, the precision score at k
     """
     N = len(actuals)
+    if N == 0:
+        N = 1
     hits = len(set(predictions[-k:]).intersection(set(actuals)))
-    if N != 0:
-        precision = hits / min(N, k)
-    else:
-        precision = 0
+    precision = hits / min(N, k)
     return precision
 
 def recall_at_k(predictions, actuals, k):
@@ -147,11 +146,10 @@ def recall_at_k(predictions, actuals, k):
     :returns recall: float, the recall score at k
     """
     N = len(actuals)
+    if N == 0:
+        N = 1
     hits = len(set(predictions[-k:]).intersection(set(actuals)))
-    if N != 0:
-        recall = hits / N
-    else:
-        recall = 0
+    recall = hits / N
     return recall
 
 def map_at_k(predictions, actuals, k):
@@ -177,6 +175,8 @@ def ndcg_at_k(predictions, actuals, k):
     :returns NDCG: float, the score at k
     """
     N = min(len(actuals), k)
+    if N == 0:
+        N = 1
     cum_gain = 0
     ideal_gain = 0
     topk = predictions[-N:]
@@ -214,8 +214,7 @@ def main():
         n_genres = None
 
     model = AttentionMovieAutoEncoder(n_inputs, n_hidden, n_outputs, n_genres,
-                                    FLAGS.hidden_fn, FLAGS.output_fn,
-                                    learning_rate=0.001)
+                                    FLAGS.hidden_fn, FLAGS.output_fn)
     tf_config = tf.ConfigProto(
         gpu_options=tf.GPUOptions(per_process_gpu_memory_fraction=0.25,
                                   allow_growth=True))
@@ -252,7 +251,7 @@ def main():
                         model.gather_indices: gather_indices,
                         model.genre_id: genre_ids,
                         model.y: y,
-                        model.dropout: 0.6
+                        model.dropout: 0.8
                     })
                     epoch_loss += batch_loss
                     score = sess.run(model.outputs, {
