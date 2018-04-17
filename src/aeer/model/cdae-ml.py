@@ -1,10 +1,10 @@
 '''
-CDAE Implementation
+CDAE Implementation for the Movielens dataset
 '''
 import argparse
 import os
 
-import aeer.dataset.event_dataset as ds
+import aeer.dataset.movie_dataset as ds
 import tensorflow as tf
 
 import numpy as np
@@ -17,20 +17,20 @@ import aeer.dataset.user_group_dataset as ug_dataset
 Example Usage:
 
 Run for 20 epochs, 100 hidden units and a 0.5 corruption ratio
-python cdae.py --epochs 20 --size 100 --corrupt 0.5
+python attention_auto_encoder.py --epochs 20 --size 100 --corrupt 0.5
 
 To turn off latent factors, eg for group latent factor
-python cdae.py --nogroup
+python attention_auto_encoder.py --nogroup
 """
 parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument('-g', '--gpu', help='set gpu device number 0-3', type=str, default='3')
 parser.add_argument('-e', '--epochs', help='Number of epochs', type=int, default=5)
 parser.add_argument('-s', '--size', help='Number of hidden layer',
-                    type=int, default=100)
+                    type=int, default=500)
 parser.add_argument('-n', '--neg_count', help='Number of negatives', type=int,
-                    default=4)
+                    default=1)
 parser.add_argument('-c', '--corrupt', help='Corruption ratio', type=float,
-                    default=0.1)
+                    default=0.2)
 parser.add_argument('--save_dir', help='Directory to save the model; if not set will not save', type=str, default=None)
 # Pass the Flag to disable
 parser.add_argument('--nogroup', help='disable group latent factor', action="store_true")
@@ -120,6 +120,8 @@ def precision_at_k(predictions, actuals, k):
     :returns precision: float, the precision score at k
     """
     N = len(actuals)
+    if N == 0:
+        N = 1
     hits = len(set(predictions[-k:]).intersection(set(actuals)))
     precision = hits / min(N, k)
     return precision
@@ -133,6 +135,8 @@ def recall_at_k(predictions, actuals, k):
     :returns recall: float, the recall score at k
     """
     N = len(actuals)
+    if N == 0:
+        N = 1
     hits = len(set(predictions[-k:]).intersection(set(actuals)))
     recall = hits / N
     return recall
@@ -184,12 +188,13 @@ def main():
     NEG_COUNT = FLAGS.neg_count
     CORRUPT_RATIO = FLAGS.corrupt
 
-    event_data = ds.EventData(ds.rsvp_chicago_file, ug_dataset.user_group_chicago_file)
-    users = event_data.get_train_users()
+    ratings_data = ds.MovieRatingsData()
+    users = ratings_data.get_train_users()
 
-    n_inputs = event_data.n_events
-    n_users = event_data.n_users
-    n_outputs = event_data.n_events
+    n_inputs = ratings_data.n_movies
+    n_users = ratings_data.n_users
+    n_genres = ratings_data.n_genres
+    n_outputs = ratings_data.n_movies
 
     model = CDAEAutoEncoder(n_inputs, n_hidden, n_outputs, n_users,
                                     FLAGS.hidden_fn, FLAGS.output_fn,
@@ -214,23 +219,25 @@ def main():
 
             tf.logging.info("Training the model...")
             for user_id in users:
-                x, y, item = event_data.get_user_train_events(
+                x, y, item = ratings_data.get_user_train_movies(
                                                     user_id, NEG_COUNT, CORRUPT_RATIO)
-                train_event_index = event_data.get_user_train_event_index(user_id)
-                user_index = event_data.get_user_index(user_id)
+                train_movie_index = ratings_data.get_user_train_movie_index(user_id)
+                user_index = ratings_data.get_user_index(user_id)
 
                 # We only compute loss on events we used as inputs
                 # Each row is to index the first dimension
                 gather_indices = list(zip(range(len(y)), item))
 
-                # Get a batch of data
-                batch_loss, _ = sess.run([model.loss, model.train], {
-                    model.x: x.toarray().astype(np.float32),
-                    model.gather_indices: gather_indices,
-                    model.user_id: user_index,
-                    model.y: y,
-                    model.dropout: 0.8
-                })
+                if len(x.data) != 0:
+                    # Get a batch of data
+                    batch_loss, _ = sess.run([model.loss, model.train], {
+                        model.x: x.toarray().astype(np.float32),
+                        model.gather_indices: gather_indices,
+                        model.user_id: user_index,
+                        model.y: y,
+                        model.dropout: 0.8
+                    })
+                
                 #score = sess.run(model.outputs, {
                 #    model.x: x.toarray().astype(np.float32),
                 #    model.gather_indices: gather_indices,
@@ -285,7 +292,7 @@ def main():
             #tf.logging.info("")
 
         # evaluate the model on the cv set
-        cv_users = event_data.get_cv_users()
+        cv_users = ratings_data.get_cv_users()
         precision = []
         recall = []
         mean_avg_prec = []
@@ -296,13 +303,13 @@ def main():
         valid_test_users = 0
         for user_id in cv_users:
             # check if user was present in training data
-            train_users = event_data.get_train_users()
+            train_users = ratings_data.get_train_users()
             if user_id in train_users:
                 valid_test_users = valid_test_users + 1
-                test_event_index = event_data.get_user_cv_event_index(user_id)
+                test_movie_index = ratings_data.get_user_cv_movie_index(user_id)
 
-                x, _, _ = event_data.get_user_train_events(user_id, 0, 0)
-                user_index = event_data.get_user_index(user_id)
+                x, _, _ = ratings_data.get_user_train_movies(user_id, 0, 0)
+                user_index = ratings_data.get_user_index(user_id)
                 # Compute score
                 score = sess.run(model.outputs, {
                     model.x: x.toarray().astype(np.float32),
@@ -319,10 +326,10 @@ def main():
                 mapk = []
                 ndcgk = []
                 for k in eval_at:
-                    preck.append(precision_at_k(index, test_event_index, k))
-                    recallk.append(recall_at_k(index, test_event_index, k))
-                    mapk.append(map_at_k(index, test_event_index, k))
-                    ndcgk.append(ndcg_at_k(index, test_event_index, k))
+                    preck.append(precision_at_k(index, test_movie_index, k))
+                    recallk.append(recall_at_k(index, test_movie_index, k))
+                    mapk.append(map_at_k(index, test_movie_index, k))
+                    ndcgk.append(ndcg_at_k(index, test_movie_index, k))
 
                 precision.append(preck)
                 recall.append(recallk)
@@ -358,15 +365,15 @@ def main():
         mean_avg_prec = []
         ndcg = []
         eval_at = [5, 10]
-        for user_id in event_data.get_test_users():
+        for user_id in ratings_data.get_test_users():
             # check if user was present in training data
-            train_users = event_data.get_train_users()
+            train_users = ratings_data.get_train_users()
             if user_id in train_users:
                 valid_test_users = valid_test_users + 1
-                test_event_index = event_data.get_user_test_event_index(user_id)
+                test_event_index = ratings_data.get_user_test_movie_index(user_id)
 
-                x, _, _ = event_data.get_user_train_events(user_id, 0, 0)
-                user_index = event_data.get_user_index(user_id)
+                x, _, _ = ratings_data.get_user_train_movies(user_id, 0, 0)
+                user_index = ratings_data.get_user_index(user_id)
                 # Compute score
                 score = sess.run(model.outputs, {
                     model.x: x.toarray().astype(np.float32),
