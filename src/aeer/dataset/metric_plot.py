@@ -28,92 +28,173 @@ def plot_hidden_metrics():
     ndcg_5_chicago_hidden = [0.1018, 0.0989, 0.0804, 0.0960, 0.0821, 0.1001, 0.0885, 0.0850, 0.0908, 0.0985]
     map_5_chicago_hidden = [0.1684, 0.1816, 0.1722, 0.1832, 0.1819, 0.1796, 0.1870, 0.1795, 0.1828, 0.1895]
     
-    plt.subplot(221)
-    plt.axis([0, 1000, 0, 0.3])
-    plt.xlabel("Hidden Units")
-    plt.ylabel("Value")
-    plt.title("Meetup - New York")
-    plt.plot(x_hidden, p_5_ny_hidden, 'rD-')
-    plt.plot(x_hidden, r_5_ny_hidden, 'go-')
-    plt.plot(x_hidden, ndcg_5_ny_hidden, 'bs-')
-    plt.plot(x_hidden, map_5_ny_hidden, 'y^-')
-    
-    plt.subplot(222)
-    plt.axis([0, 1000, 0, 0.3])
-    plt.xlabel("Hidden Units")
-    plt.ylabel("Value")
-    plt.title("Meetup - San Francisco")
-    plt.plot(x_hidden, p_5_sfo_hidden, 'rD-')
-    plt.plot(x_hidden, r_5_sfo_hidden, 'go-')
-    plt.plot(x_hidden, ndcg_5_sfo_hidden, 'bs-')
-    plt.plot(x_hidden, map_5_sfo_hidden, 'y^-')
-    
-    plt.subplot(223)
-    plt.axis([0, 1000, 0, 0.3])
-    plt.xlabel("Hidden Units")
-    plt.ylabel("Value")
-    plt.title("Meetup - Washington DC")
-    plt.plot(x_hidden, p_5_dc_hidden, 'rD-')
-    plt.plot(x_hidden, r_5_dc_hidden, 'go-')
-    plt.plot(x_hidden, ndcg_5_dc_hidden, 'bs-')
-    plt.plot(x_hidden, map_5_dc_hidden, 'y^-')
-    
-    plt.subplot(224)
-    plt.axis([0, 1000, 0, 0.3])
-    plt.xlabel("Hidden Units")
-    plt.ylabel("Value")
-    plt.title("Meetup - Chicago")
-    plt.plot(x_hidden, p_5_chicago_hidden, 'rD-')
-    plt.plot(x_hidden, r_5_chicago_hidden, 'go-')
-    plt.plot(x_hidden, ndcg_5_chicago_hidden, 'bs-')
-    plt.plot(x_hidden, map_5_chicago_hidden, 'y^-')
-    
-    plt.subplots_adjust(top=0.92, bottom=0.08, left=0.10, right=0.95, hspace=0.75,
-                    wspace=0.5)
-    
-    plt.show()
-    
-    
-def plot_ml_hidden_metrics():
     p_5_ml_hidden = [0.0712, 0.0827, 0.0722, 0.0786, 0.0793, 0.0782, 0.0683, 0.0797, 0.0783, 0.0703]
     r_5_ml_hidden = [0.0609, 0.0723, 0.0609, 0.0677, 0.0685, 0.0679, 0.0593, 0.0694, 0.0673, 0.0609]
     ndcg_5_ml_hidden = [0.0976, 0.1094, 0.0968, 0.0946, 0.1080, 0.1117, 0.0801, 0.1066, 0.1012, 0.0871]
     map_5_ml_hidden = [0.0648, 0.0694, 0.0643, 0.0679, 0.0674, 0.0693, 0.0532, 0.0678, 0.0636, 0.0605]
     
+    plt.subplot(151)
+    plt.axis([0, 1000, 0, 0.3])
+    plt.xlabel("Hidden Units")
+    plt.ylabel("Value")
+    plt.title("Meetup-New York")
+    prec5, = plt.plot(x_hidden, p_5_ny_hidden, 'rD-')
+    recall5, = plt.plot(x_hidden, r_5_ny_hidden, 'go-')
+    ndcg5, = plt.plot(x_hidden, ndcg_5_ny_hidden, 'bs-')
+    map5, = plt.plot(x_hidden, map_5_ny_hidden, 'y^-')
+    plt.grid(True)
+    
+    plt.subplot(152)
+    plt.axis([0, 1000, 0, 0.3])
+    plt.xlabel("Hidden Units")
+    plt.ylabel("Value")
+    plt.title("Meetup-San Francisco")
+    plt.plot(x_hidden, p_5_sfo_hidden, 'rD-')
+    plt.plot(x_hidden, r_5_sfo_hidden, 'go-')
+    plt.plot(x_hidden, ndcg_5_sfo_hidden, 'bs-')
+    plt.plot(x_hidden, map_5_sfo_hidden, 'y^-')
+    plt.grid(True)
+    
+    plt.subplot(153)
+    plt.axis([0, 1000, 0, 0.3])
+    plt.xlabel("Hidden Units")
+    plt.ylabel("Value")
+    plt.title("Meetup-Washington DC")
+    plt.plot(x_hidden, p_5_dc_hidden, 'rD-')
+    plt.plot(x_hidden, r_5_dc_hidden, 'go-')
+    plt.plot(x_hidden, ndcg_5_dc_hidden, 'bs-')
+    plt.plot(x_hidden, map_5_dc_hidden, 'y^-')
+    plt.grid(True)
+    
+    plt.subplot(154)
+    plt.axis([0, 1000, 0, 0.3])
+    plt.xlabel("Hidden Units")
+    plt.ylabel("Value")
+    plt.title("Meetup-Chicago")
+    plt.plot(x_hidden, p_5_chicago_hidden, 'rD-')
+    plt.plot(x_hidden, r_5_chicago_hidden, 'go-')
+    plt.plot(x_hidden, ndcg_5_chicago_hidden, 'bs-')
+    plt.plot(x_hidden, map_5_chicago_hidden, 'y^-')
+    plt.grid(True)
+    
+    plt.subplot(155)
+    plt.axis([0, 1000, 0, 0.15])
+    plt.xlabel("Hidden Units")
+    plt.ylabel("Value")
+    plt.title("Movielens-100K")
+    plt.plot(x_hidden, p_5_ml_hidden, 'rD-')
+    plt.plot(x_hidden, r_5_ml_hidden, 'go-')
+    plt.plot(x_hidden, ndcg_5_ml_hidden, 'bs-')
+    plt.plot(x_hidden, map_5_ml_hidden, 'y^-')
+    plt.grid(True)
+    
+    # plt.subplots_adjust(top=0.1, bottom=0.1, left=0.10, right=0.2, hspace=0.3, wspace=0.5)
+    plt.subplots_adjust(bottom=0.2, wspace=0.5)
+    plt.figlegend((prec5, recall5, ndcg5, map5), ('Precision@5', 'Recall@5', 'NDCG@5', 'MAP@5'), loc='lower center', ncol=5)
+    
+    # plt.savefig('hidden.eps')
+    # plt.tight_layout()
+    fig_size = plt.rcParams["figure.figsize"]
+    # print("Current size:", fig_size)
+    fig_size[0] = 20
+    fig_size[1] = 5
+    plt.rcParams["figure.figsize"] = fig_size
+    plt.show()
+    
 
-def plot_ny_corrupt_metrics():
+def plot_corrupt_metrics():
     p_5_ny_corrupt = [0.2060, 0.2295, 0.2200, 0.2106, 0.2140, 0.1722, 0.1111, 0.1067, 0.1046]
     r_5_ny_corrupt = [0.2026, 0.2255, 0.2164, 0.2064, 0.2101, 0.1688, 0.1098, 0.1043, 0.1035]
     ndcg_5_ny_corrupt = [0.0961, 0.0987, 0.1085, 0.1072, 0.1045, 0.0872, 0.0483, 0.0581, 0.0490]
     map_5_ny_corrupt = [0.1482, 0.1574, 0.1631, 0.1541, 0.1585, 0.1207, 0.0737, 0.0776, 0.0704]
 
-    
-def plot_sfo_corrupt_metrics():
     p_5_sfo_corrupt = [0.2798, 0.2864, 0.2868, 0.2722, 0.2697, 0.2647, 0.2653, 0.2285, 0.1681]
     r_5_sfo_corrupt = [0.2768, 0.2830, 0.2834, 0.2692, 0.2654, 0.2613, 0.2608, 0.2255, 0.1649]
-    ndcg_5_sfo_corrupt = [0.1119, 0.1211, 0.1167, 0.1112, 0.1299, 0.1114, 0.1094, 0.0997, 0.636]
+    ndcg_5_sfo_corrupt = [0.1119, 0.1211, 0.1167, 0.1112, 0.1299, 0.1114, 0.1094, 0.0997, 0.0636]
     map_5_sfo_corrupt = [0.1949, 0.2065, 0.2065, 0.1911, 0.1981, 0.1853, 0.1854, 0.1621, 0.1016]    
 
-
-def plot_dc_corrupt_metrics():
     p_5_dc_corrupt = [0.2595, 0.2600, 0.2558, 0.2433, 0.2457, 0.2585, 0.2547, 0.2487, 0.2325]
     r_5_dc_corrupt = [0.2513, 0.2536, 0.2484, 0.2370, 0.2401, 0.2521, 0.2459, 0.2415, 0.2261]
     ndcg_5_dc_corrupt = [0.0909, 0.1049, 0.0989, 0.0911, 0.0888, 0.0918, 0.1057, 0.1056, 0.0989]
     map_5_dc_corrupt = [0.1647, 0.1816, 0.1771, 0.1607, 0.1631, 0.1780, 0.1736, 0.1784, 0.1687]
     
-    
-def plot_chicago_corrupt_metrics():
     p_5_chicago_corrupt = [0.2762, 0.2771, 0.2804, 0.2814, 0.2762, 0.2822, 0.2695, 0.2863, 0.2731]
     r_5_chicago_corrupt = [0.2752, 0.2752, 0.2785, 0.2801, 0.2738, 0.2813, 0.2683, 0.2844, 0.2713]
     ndcg_5_chicago_corrupt = [0.0922, 0.0821, 0.0938, 0.0931, 0.0953, 0.0954, 0.0975, 0.1135, 0.1103]
     map_5_chicago_corrupt = [0.1811, 0.1819, 0.1809, 0.1827, 0.1817, 0.1830, 0.1745, 0.1886, 0.1839]
 
-    
-def plot_ml_corrupt_metrics():
     p_5_ml_corrupt = [0.0702, 0.0793, 0.0756, 0.0742, 0.0786, 0.0782, 0.0687, 0.0661, 0.0634]
     r_5_ml_corrupt = [0.0592, 0.0685, 0.0653, 0.0633, 0.0677, 0.0686, 0.0581, 0.0576, 0.0531]
     ndcg_5_ml_corrupt = [0.0989, 0.1080, 0.0850, 0.0989, 0.0932, 0.1004, 0.0802, 0.0856, 0.0806]
     map_5_ml_corrupt = [0.0661, 0.0674, 0.0559, 0.0682, 0.0672, 0.0684, 0.0585, 0.0625, 0.0562]
+    
+    plt.subplot(151)
+    plt.axis([0, 1000, 0, 0.3])
+    plt.xlabel("Corruption Ratio")
+    plt.ylabel("Value")
+    plt.title("Meetup-New York")
+    prec5 = plt.plot(x_hidden, p_5_ny_corrupt, 'rD-')
+    recall5 = plt.plot(x_hidden, r_5_ny_corrupt, 'go-')
+    ndcg5 = plt.plot(x_hidden, ndcg_5_ny_corrupt, 'bs-')
+    map5 = plt.plot(x_hidden, map_5_ny_corrupt, 'y^-')
+    plt.grid(True)
+    
+    plt.subplot(152)
+    plt.axis([0, 1000, 0, 0.3])
+    plt.xlabel("orruption Ratio")
+    plt.ylabel("Value")
+    plt.title("Meetup-San Francisco")
+    plt.plot(x_hidden, p_5_sfo_corrupt, 'rD-')
+    plt.plot(x_hidden, r_5_sfo_corrupt, 'go-')
+    plt.plot(x_hidden, ndcg_5_sfo_corrupt, 'bs-')
+    plt.plot(x_hidden, map_5_sfo_corrupt, 'y^-')
+    plt.grid(True)
+    
+    plt.subplot(153)
+    plt.axis([0, 1000, 0, 0.3])
+    plt.xlabel("Corruption Ratio")
+    plt.ylabel("Value")
+    plt.title("Meetup-Washington DC")
+    plt.plot(x_hidden, p_5_dc_corrupt, 'rD-')
+    plt.plot(x_hidden, r_5_dc_corrupt, 'go-')
+    plt.plot(x_hidden, ndcg_5_dc_corrupt, 'bs-')
+    plt.plot(x_hidden, map_5_dc_corrupt, 'y^-')
+    plt.grid(True)
+    
+    plt.subplot(154)
+    plt.axis([0, 1000, 0, 0.3])
+    plt.xlabel("Corruption Ratio")
+    plt.ylabel("Value")
+    plt.title("Meetup-Chicago")
+    plt.plot(x_hidden, p_5_chicago_corrupt, 'rD-')
+    plt.plot(x_hidden, r_5_chicago_corrupt, 'go-')
+    plt.plot(x_hidden, ndcg_5_chicago_corrupt, 'bs-')
+    plt.plot(x_hidden, map_5_chicago_corrupt, 'y^-')
+    plt.grid(True)
+    
+    plt.subplot(155)
+    plt.axis([0, 1000, 0, 0.15])
+    plt.xlabel("Corruption Ratio")
+    plt.ylabel("Value")
+    plt.title("Movielens-100K")
+    plt.plot(x_hidden, p_5_ml_corrupt, 'rD-')
+    plt.plot(x_hidden, r_5_ml_corrupt, 'go-')
+    plt.plot(x_hidden, ndcg_5_ml_corrupt, 'bs-')
+    plt.plot(x_hidden, map_5_ml_corrupt, 'y^-')
+    plt.grid(True)
+    
+    # plt.subplots_adjust(top=0.1, bottom=0.1, left=0.10, right=0.2, hspace=0.3, wspace=0.5)
+    plt.subplots_adjust(wspace=0.5)
+    plt.figlegend((prec5, recall5, ndcg5, map5), ('Precision@5', 'Recall@5', 'NDCG@5', 'MAP@5'), loc='lower center', ncol=3)
+    
+    # plt.savefig('hidden.eps')
+    # plt.tight_layout()
+    fig_size = plt.rcParams["figure.figsize"]
+    # print("Current size:", fig_size)
+    fig_size[0] = 20
+    fig_size[1] = 5
+    plt.rcParams["figure.figsize"] = fig_size
+    plt.show()
 
 
 def main():
