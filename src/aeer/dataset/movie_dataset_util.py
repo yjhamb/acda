@@ -11,17 +11,20 @@ RATINGS_SCORE_CONTEXT_FILE = "../../../dataset/movielens/rating_score_context.cs
 MOVIES_FILE = "../../../dataset/movielens/movies.csv"
 TAGS_FILE = "../../../dataset/movielens/tags.csv"
 
+
 def generate_movie_dataset():
     ratings = pd.read_csv(RATINGS_FILE)
     movies = pd.read_csv(MOVIES_FILE)
     ratings_context = pd.merge(ratings, movies, on='movieId', how='left')
     ratings_context.to_csv(RATINGS_CONTEXT_FILE, index=False)
+
     
 def update_movie_dataset():
     ratings = pd.read_csv(RATINGS_SCORE_CONTEXT_FILE)
     ratings.loc[ratings['score'] >= 5.0, 'rating'] = 1
     ratings.loc[ratings['score'] < 5.0, 'rating'] = 0
     ratings.to_csv(RATINGS_CONTEXT_FILE, index=False)
+
     
 def perform_train_test_split():
     RATINGS_TRAIN_FILE = "../../../dataset/movielens/ratings_train.csv"
@@ -41,6 +44,7 @@ def perform_train_test_split():
     train_ratings_set.to_csv(RATINGS_TRAIN_FILE, index=False)
     test_ratings_set.to_csv(RATINGS_TEST_FILE, index=False)
 
+
 def generate_librec_rating_file():
     train_file = "../../../dataset/rsvp_chicago_train.csv"
     train_rating_file = "../../../dataset/rsvp_chicago_train_rating.csv"
@@ -57,10 +61,21 @@ def generate_librec_rating_file():
     test_events_ratings.to_csv(test_rating_file, index=False)
 
 
+def print_ratings_data(file_name):
+    ratings = pd.read_csv(file_name)
+    print("Total Ratings", len(ratings))
+    print("Users:", len(ratings['userId'].unique()))
+    print("Events:", len(ratings['movieId'].unique()))
+    print("Positive Ratings:", len(ratings[ratings['rating'] == 1]))
+    print("Negative Ratings:", len(ratings[ratings['rating'] == 0]))
+
+
 def main():
     print("Main method")
-    perform_train_test_split()
+    # perform_train_test_split()
+    print_ratings_data(RATINGS_CONTEXT_FILE)
     print("Main method complete")
+
 
 if __name__ == '__main__':
     main()
