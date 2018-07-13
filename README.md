@@ -1,2 +1,2 @@
 # ACDA
-Attentive Contextual Autoencoder for Recommendation
+Attentive Contextual Denoising Autoencoder for Recommendation
