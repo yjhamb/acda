@@ -1,2 +1,2 @@
-# aeer
-AutoEncoder for Event Recommendation
+# ACDA
+Attentive Contextual Autoencoder for Recommendation
