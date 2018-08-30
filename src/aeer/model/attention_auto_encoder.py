@@ -2,18 +2,6 @@
 Denoising AutoEncoder Implementation that utilizes the attention mechanism
 to incorporate contextual information such as the group and venue
 '''
-import argparse
-import os
-
-import aeer.dataset.event_dataset as ds
-import tensorflow as tf
-
-import numpy as np
-from sklearn.utils import shuffle
-
-from aeer.model.utils import ACTIVATION_FN, set_logging_config
-import aeer.dataset.user_group_dataset as ug_dataset
-
 """
 Example Usage:
 
@@ -23,6 +11,18 @@ python attention_auto_encoder.py --epochs 20 --size 100 --corrupt 0.5
 To turn off latent factors, eg for group latent factor
 python attention_auto_encoder.py --nogroup
 """
+
+import argparse
+import os
+
+from sklearn.utils import shuffle
+
+import aeer.dataset.event_dataset as ds
+import aeer.dataset.user_group_dataset as ug_dataset
+from aeer.model.utils import ACTIVATION_FN, set_logging_config
+import numpy as np
+import tensorflow as tf
+
 parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument('-g', '--gpu', help='set gpu device number 0-3', type=str, default='3')
 parser.add_argument('-e', '--epochs', help='Number of epochs', type=int, default=5)
@@ -86,7 +86,7 @@ class AttentionAutoEncoder(object):
         preactivation = tf.nn.xw_plus_b(self.x, W, b)
         # perform batch normalization
         u_mean, u_var = tf.nn.moments(preactivation, [0])
-        #preactivation = tf.nn.batch_normalization(preactivation, u_mean, u_var, beta, scale, epsilon)
+        # preactivation = tf.nn.batch_normalization(preactivation, u_mean, u_var, beta, scale, epsilon)
 
         hidden = ACTIVATION_FN[hidden_activation](preactivation)
         hidden = tf.nn.dropout(hidden, self.dropout)
@@ -137,21 +137,22 @@ class AttentionAutoEncoder(object):
         scale = tf.Variable(tf.ones([n_outputs]))
         beta = tf.Variable(tf.zeros([n_outputs]))
         u_mean, u_var = tf.nn.moments(preactivation_output, [0])
-        #preactivation_output = tf.nn.batch_normalization(preactivation_output, u_mean, u_var, beta, scale, epsilon)
+        # preactivation_output = tf.nn.batch_normalization(preactivation_output, u_mean, u_var, beta, scale, epsilon)
         self.outputs = ACTIVATION_FN[output_activation](preactivation_output)
 
         self.targets = tf.gather_nd(self.outputs, self.gather_indices)
         self.actuals = tf.placeholder(tf.int64, shape=[None])
 
         # add weight regularizer
-        #reg_losses = tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES)
+        # reg_losses = tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES)
 
         # square loss
-        #self.loss = tf.losses.mean_squared_error(self.targets, self.y) + sum(reg_losses)
+        # self.loss = tf.losses.mean_squared_error(self.targets, self.y) + sum(reg_losses)
         self.loss = tf.losses.mean_squared_error(self.targets, self.y)
         optimizer = tf.train.AdamOptimizer(learning_rate)
         # Train Model
         self.train = optimizer.minimize(self.loss)
+
 
 def precision_at_k(predictions, actuals, k):
     """
@@ -166,6 +167,7 @@ def precision_at_k(predictions, actuals, k):
     precision = hits / min(N, k)
     return precision
 
+
 def recall_at_k(predictions, actuals, k):
     """
     Computes the recall at k
@@ -179,6 +181,7 @@ def recall_at_k(predictions, actuals, k):
     recall = hits / N
     return recall
 
+
 def map_at_k(predictions, actuals, k):
     """
     Computes the MAP at k
@@ -188,10 +191,11 @@ def map_at_k(predictions, actuals, k):
     :returns MAP: float, the score at k
     """
     avg_prec = []
-    for i in range(1, k+1):
+    for i in range(1, k + 1):
         prec = precision_at_k(predictions, actuals, i)
         avg_prec.append(prec)
     return np.mean(avg_prec)
+
 
 def ndcg_at_k(predictions, actuals, k):
     """
@@ -219,6 +223,7 @@ def ndcg_at_k(predictions, actuals, k):
     else:
         ndcg = 0
     return ndcg
+
 
 def main():
     n_epochs = FLAGS.epochs
@@ -285,60 +290,14 @@ def main():
                     model.y: y,
                     model.dropout: 0.8
                 })
-                #score = sess.run(model.outputs, {
-                #    model.x: x.toarray().astype(np.float32),
-                #    model.gather_indices: gather_indices,
-                #    model.group_id: group_ids,
-                #    model.venue_id: venue_ids,
-                #    model.y: y,
-                #    model.dropout: 1.0
-                #})[0]
                 epoch_loss += batch_loss
-                # Sorted in ascending order, we then take the last values
-                #index = np.argsort(score)
-
-                # Number of test instances
-                #preck = []
-                #recallk = []
-                #mapk = []
-                #ndcgk = []
-                #for k in eval_at:
-                #    preck.append(precision_at_k(index, train_event_index, k))
-                #    recallk.append(recall_at_k(index, train_event_index, k))
-                #    mapk.append(map_at_k(index, train_event_index, k))
-                #    ndcgk.append(ndcg_at_k(index, train_event_index, k))
-
-                #precision.append(preck)
-                #recall.append(recallk)
-                #mean_avg_prec.append(mapk)
-                #ndcg.append(ndcgk)
+                
             tf.logging.info("Epoch: {:>16}       Loss: {:>10,.6f}".format("%s/%s" % (epoch, n_epochs),
                                                                 epoch_loss))
             tf.logging.info("")
             if prev_epoch_loss != 0 and abs(epoch_loss - prev_epoch_loss) < 1:
                 tf.logging.info("Decaying learning rate...")
                 model.decay_learning_rate(sess, 0.5)
-
-            #prev_epoch_loss = epoch_loss
-            #avg_precision_5, avg_precision_10 = zip(*precision)
-            #avg_precision_5, avg_precision_10 = np.mean(avg_precision_5), np.mean(avg_precision_10)
-
-            #avg_recall_5, avg_recall_10 = zip(*recall)
-            #avg_recall_5, avg_recall_10 = np.mean(avg_recall_5), np.mean(avg_recall_10)
-
-            #avg_map_5, avg_map_10 = zip(*mean_avg_prec)
-            #avg_map_5, avg_map_10 = np.mean(avg_map_5), np.mean(avg_map_10)
-
-            #avg_ndcg_5, avg_ndcg_10 = zip(*ndcg)
-            #avg_ndcg_5, avg_ndcg_10 = np.mean(avg_ndcg_5), np.mean(avg_ndcg_10)
-
-            # Directly access variables
-            #tf.logging.info(f"Precision@5: {avg_precision_5:>10.6f}       Precision@10: {avg_precision_10:>10.6f}")
-            #tf.logging.info(f"Recall@5:    {avg_recall_5:>10.6f}       Recall@10:    {avg_recall_10:>10.6f}")
-            #tf.logging.info(f"MAP@5:       {avg_map_5:>10.6f}       MAP@10:       {avg_map_10:>10.6f}")
-            #tf.logging.info(f"NDCG@5:      {avg_ndcg_5:>10.6f}       NDCG@10:      {avg_ndcg_10:>10.6f}")
-            #tf.logging.info("")
-
         
         # evaluate the model on the cv set
         cv_users = event_data.get_cv_users()
@@ -366,7 +325,7 @@ def main():
                     model.group_id: group_ids,
                     model.venue_id: venue_ids,
                     model.dropout: 1.0
-                })[0] # We only do one sample at a time, take 0 index
+                })[0]  # We only do one sample at a time, take 0 index
 
                 # Sorted in ascending order, we then take the last values
                 index = np.argsort(score)
@@ -432,7 +391,7 @@ def main():
                     model.group_id: group_ids,
                     model.venue_id: venue_ids,
                     model.dropout: 1.0
-                })[0] # We only do one sample at a time, take 0 index
+                })[0]  # We only do one sample at a time, take 0 index
 
                 # Sorted in ascending order, we then take the last values
                 index = np.argsort(score)
@@ -474,6 +433,7 @@ def main():
         tf.logging.info(f"NDCG@5:      {avg_ndcg_5:>10.6f}       NDCG@10:      {avg_ndcg_10:>10.6f}")
         tf.logging.info("")
     sv.request_stop()
+
 
 if __name__ == '__main__':
     FLAGS = parser.parse_args()

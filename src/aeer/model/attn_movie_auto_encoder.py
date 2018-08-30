@@ -2,17 +2,6 @@
 Denoising AutoEncoder Implementation that utilizes the attention mechanism
 to incorporate contextual information such as the genre for the movielens dataset
 '''
-import argparse
-import os
-
-import aeer.dataset.movie_dataset as ds
-import tensorflow as tf
-
-import numpy as np
-from sklearn.utils import shuffle
-
-from aeer.model.utils import ACTIVATION_FN, set_logging_config
-
 """
 Example Usage:
 
@@ -22,6 +11,17 @@ python attention_auto_encoder.py --epochs 20 --size 100 --corrupt 0.5
 To turn off latent factors, eg for group latent factor
 python attention_auto_encoder.py --nogroup
 """
+
+import argparse
+import os
+
+from sklearn.utils import shuffle
+
+import aeer.dataset.movie_dataset as ds
+from aeer.model.utils import ACTIVATION_FN, set_logging_config
+import numpy as np
+import tensorflow as tf
+
 parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument('-g', '--gpu', help='set gpu device number 0-3', type=str, default='3')
 parser.add_argument('-e', '--epochs', help='Number of epochs', type=int, default=5)
@@ -109,18 +109,14 @@ class AttentionMovieAutoEncoder(object):
         self.targets = tf.gather_nd(self.outputs, self.gather_indices)
         self.actuals = tf.placeholder(tf.int64, shape=[None])
 
-        # add weight regularizer
-        #reg_losses = tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES)
-
-        # square loss
-        #self.loss = tf.losses.mean_squared_error(self.targets, self.y) + sum(reg_losses)
         # square loss
         self.loss = tf.losses.mean_squared_error(self.targets, self.y)
-        #self.loss = tf.losses.sigmoid_cross_entropy(self.targets, self.y)
+        # self.loss = tf.losses.sigmoid_cross_entropy(self.targets, self.y)
         optimizer = tf.train.AdamOptimizer(learning_rate)
-        #optimizer = tf.train.RMSPropOptimizer(learning_rate)
+        # optimizer = tf.train.RMSPropOptimizer(learning_rate)
         # Train Model
         self.train = optimizer.minimize(self.loss)
+
 
 def precision_at_k(predictions, actuals, k):
     """
@@ -137,6 +133,7 @@ def precision_at_k(predictions, actuals, k):
     precision = hits / min(N, k)
     return precision
 
+
 def recall_at_k(predictions, actuals, k):
     """
     Computes the recall at k
@@ -152,6 +149,7 @@ def recall_at_k(predictions, actuals, k):
     recall = hits / N
     return recall
 
+
 def map_at_k(predictions, actuals, k):
     """
     Computes the MAP at k
@@ -161,10 +159,11 @@ def map_at_k(predictions, actuals, k):
     :returns MAP: float, the score at k
     """
     avg_prec = []
-    for i in range(1, k+1):
+    for i in range(1, k + 1):
         prec = precision_at_k(predictions, actuals, i)
         avg_prec.append(prec)
     return np.mean(avg_prec)
+
 
 def ndcg_at_k(predictions, actuals, k):
     """
@@ -194,6 +193,7 @@ def ndcg_at_k(predictions, actuals, k):
     else:
         ndcg = 0
     return ndcg
+
 
 def main():
     n_epochs = FLAGS.epochs
@@ -287,7 +287,7 @@ def main():
                 tf.logging.info("Decaying learning rate...")
                 model.decay_learning_rate(sess, 0.5)
             
-            #prev_epoch_loss = epoch_loss
+            # prev_epoch_loss = epoch_loss
             avg_precision_5, avg_precision_10 = zip(*precision)
             avg_precision_5, avg_precision_10 = np.mean(avg_precision_5), np.mean(avg_precision_10)
 
@@ -331,7 +331,7 @@ def main():
                     model.x: x.toarray().astype(np.float32),
                     model.genre_id: genre_ids,
                     model.dropout: 1.0
-                })[0] # We only do one sample at a time, take 0 index
+                })[0]  # We only do one sample at a time, take 0 index
 
                 # Sorted in ascending order, we then take the last values
                 index = np.argsort(score)
@@ -395,7 +395,7 @@ def main():
                     model.x: x.toarray().astype(np.float32),
                     model.genre_id: genre_ids,
                     model.dropout: 1.0
-                })[0] # We only do one sample at a time, take 0 index
+                })[0]  # We only do one sample at a time, take 0 index
 
                 # Sorted in ascending order, we then take the last values
                 index = np.argsort(score)
@@ -437,6 +437,7 @@ def main():
         tf.logging.info(f"NDCG@5:      {avg_ndcg_5:>10.6f}       NDCG@10:      {avg_ndcg_10:>10.6f}")
         tf.logging.info("")
     sv.request_stop()
+
 
 if __name__ == '__main__':
     FLAGS = parser.parse_args()

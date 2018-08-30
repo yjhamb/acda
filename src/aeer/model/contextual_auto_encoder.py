@@ -2,18 +2,19 @@
 Denoising AutoEncoder Implementation that incorporates contextual group and venue data
 '''
 from __future__ import print_function, division  # Python2/3 Compatability
+
 import os
 
-os.environ['CUDA_VISIBLE_DEVICES'] = '3'
+from sklearn.preprocessing import MultiLabelBinarizer
+from sklearn.utils import shuffle
+from tensorflow.contrib.layers import fully_connected
 
 import aeer.dataset.event_dataset as ds
 import aeer.dataset.user_group_dataset as user_group_ds
-import tensorflow as tf
-from tensorflow.contrib.layers import fully_connected
-
 import numpy as np
-from sklearn.preprocessing import MultiLabelBinarizer
-from sklearn.utils import shuffle
+import tensorflow as tf
+
+os.environ['CUDA_VISIBLE_DEVICES'] = '3'
 
 
 class ContextualAutoEncoder(object):
@@ -26,29 +27,19 @@ class ContextualAutoEncoder(object):
 
         self.y = tf.placeholder(tf.float32, shape=[None])
 
-        # Dropout inputs == Masking Noise on inputs
-        # By default if we do not feed this in, no dropout will occur
-        # self.dropout = tf.placeholder_with_default([1.0], None)
-        #n_outputs = n_inputs
-
         # Weights
         W = tf.get_variable('W', shape=[n_inputs, n_hidden])
         b = tf.get_variable('Bias', shape=[n_hidden])
-        
-        # We want a size of [Number of Events, Latent Size]
-        #event_weight_bias = tf.get_variable('EventBias', shape=[n_inputs, n_hidden])
-        # We lookup a bias for each event
-        #event_bias = tf.nn.embedding_lookup(event_bias, event_ids)
 
         # create hidden layer with default ReLU activation
         # fully_connected(self.x, n_hidden)
         hidden = tf.nn.relu(tf.nn.xw_plus_b(self.x, W, b))
-        #hidden = tf.nn.relu(tf.add_n(tf.nn.xw_plus_b(self.x, W, b), self.venue_factor, self.group_factor))
+        # hidden = tf.nn.relu(tf.add_n(tf.nn.xw_plus_b(self.x, W, b), self.venue_factor, self.group_factor))
         
         # add weight regularizer
         self.reg_scale = 0.01
         self.weights_regularizer = tf.nn.l2_loss(W, "weight_loss")
-        #self.reg_loss = tf.reduce_sum(tf.abs(W))
+        # self.reg_loss = tf.reduce_sum(tf.abs(W))
 
         # create the output layer with no activation function
         self.outputs = fully_connected(hidden, n_outputs, activation_fn=None)
@@ -61,7 +52,7 @@ class ContextualAutoEncoder(object):
         self.top_k = tf.nn.in_top_k(self.outputs, self.actuals, k=10)
 
         # square loss
-        #self.loss = tf.losses.mean_squared_error(self.targets, self.y) + self.reg_scale * self.weights_regularizer
+        # self.loss = tf.losses.mean_squared_error(self.targets, self.y) + self.reg_scale * self.weights_regularizer
         self.loss = tf.losses.mean_squared_error(self.targets, self.y)
         optimizer = tf.train.AdamOptimizer(learning_rate)
         # Train Model
@@ -145,6 +136,7 @@ def main():
             avg_precision = precision / valid_test_users
 
         print("Precision: {:,.6f}".format(avg_precision))
+
 
 if __name__ == '__main__':
     main()
