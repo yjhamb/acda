@@ -17,9 +17,10 @@ import os
 
 from sklearn.utils import shuffle
 
+from aeer.common.metrics import precision_at_k, recall_at_k, map_at_k, ndcg_at_k
+from aeer.common.utils import ACTIVATION_FN, set_logging_config
 import aeer.dataset.event_dataset as ds
 import aeer.dataset.user_group_dataset as ug_dataset
-from aeer.model.utils import ACTIVATION_FN, set_logging_config
 import numpy as np
 import tensorflow as tf
 
@@ -72,22 +73,14 @@ class AttentionAutoEncoder(object):
         self.y = tf.placeholder(tf.float32, shape=[None])
         self.dropout = tf.placeholder_with_default(1.0, shape=(), name='Dropout')
 
-        reg_constant = 0.01
         # Weights
-        W = tf.get_variable('W', shape=[n_inputs, n_hidden], regularizer=tf.contrib.layers.l2_regularizer(scale=reg_constant))
+        W = tf.get_variable('W', shape=[n_inputs, n_hidden])
         b = tf.get_variable('Bias', shape=[n_hidden])
 
         # Uniform Initialization U(-eps, eps)
         eps = 0.01
-        scale = tf.Variable(tf.ones([n_hidden]))
-        beta = tf.Variable(tf.zeros([n_hidden]))
-        epsilon = 1e-3
 
         preactivation = tf.nn.xw_plus_b(self.x, W, b)
-        # perform batch normalization
-        u_mean, u_var = tf.nn.moments(preactivation, [0])
-        # preactivation = tf.nn.batch_normalization(preactivation, u_mean, u_var, beta, scale, epsilon)
-
         hidden = ACTIVATION_FN[hidden_activation](preactivation)
         hidden = tf.nn.dropout(hidden, self.dropout)
 
@@ -101,7 +94,7 @@ class AttentionAutoEncoder(object):
             self.venue_factor = tf.nn.embedding_lookup(venue_bias, self.venue_id,
                                                        name='VenueLookup')
             v_attn_weight = tf.get_variable('V_AttentionWLogits',
-                                                      shape=[n_hidden, 1], regularizer=tf.contrib.layers.l2_regularizer(scale=reg_constant))
+                                                      shape=[n_hidden, 1])
             v_attention = tf.matmul(self.venue_factor, v_attn_weight)
 
             # Weighted sum of venue factors
@@ -118,7 +111,7 @@ class AttentionAutoEncoder(object):
             self.group_factor = tf.nn.embedding_lookup(group_bias, self.group_id,
                                                        name='GroupLookup')
             g_attn_weight = tf.get_variable('AttentionWLogits',
-                                                      shape=[n_hidden, 1], regularizer=tf.contrib.layers.l2_regularizer(scale=reg_constant))
+                                                      shape=[n_hidden, 1])
             g_attention = tf.matmul(self.group_factor, g_attn_weight)
 
             # Weighted sum of group factors
@@ -130,99 +123,19 @@ class AttentionAutoEncoder(object):
         attn_output = tf.nn.softmax(tf.nn.tanh(attention))
 
         # create the output layer
-        W2 = tf.get_variable('W2', shape=[n_hidden, n_outputs], regularizer=tf.contrib.layers.l2_regularizer(scale=reg_constant))
+        W2 = tf.get_variable('W2', shape=[n_hidden, n_outputs])
         b2 = tf.get_variable('Bias2', shape=[n_outputs])
         preactivation_output = tf.nn.xw_plus_b(tf.multiply(attn_output, hidden), W2, b2)
-        # perform batch normalization
-        scale = tf.Variable(tf.ones([n_outputs]))
-        beta = tf.Variable(tf.zeros([n_outputs]))
-        u_mean, u_var = tf.nn.moments(preactivation_output, [0])
-        # preactivation_output = tf.nn.batch_normalization(preactivation_output, u_mean, u_var, beta, scale, epsilon)
+        
         self.outputs = ACTIVATION_FN[output_activation](preactivation_output)
 
         self.targets = tf.gather_nd(self.outputs, self.gather_indices)
         self.actuals = tf.placeholder(tf.int64, shape=[None])
 
-        # add weight regularizer
-        # reg_losses = tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES)
-
-        # square loss
-        # self.loss = tf.losses.mean_squared_error(self.targets, self.y) + sum(reg_losses)
         self.loss = tf.losses.mean_squared_error(self.targets, self.y)
         optimizer = tf.train.AdamOptimizer(learning_rate)
         # Train Model
         self.train = optimizer.minimize(self.loss)
-
-
-def precision_at_k(predictions, actuals, k):
-    """
-    Computes the precision at k
-    :param predictions: array, predicted values
-    :param actuals: array, actual values
-    :param k: int, value to compute the metric at
-    :returns precision: float, the precision score at k
-    """
-    N = len(actuals)
-    hits = len(set(predictions[-k:]).intersection(set(actuals)))
-    precision = hits / min(N, k)
-    return precision
-
-
-def recall_at_k(predictions, actuals, k):
-    """
-    Computes the recall at k
-    :param predictions: array, predicted values
-    :param actuals: array, actual values
-    :param k: int, value to compute the metric at
-    :returns recall: float, the recall score at k
-    """
-    N = len(actuals)
-    hits = len(set(predictions[-k:]).intersection(set(actuals)))
-    recall = hits / N
-    return recall
-
-
-def map_at_k(predictions, actuals, k):
-    """
-    Computes the MAP at k
-    :param predictions: array, predicted values
-    :param actuals: array, actual values
-    :param k: int, value to compute the metric at
-    :returns MAP: float, the score at k
-    """
-    avg_prec = []
-    for i in range(1, k + 1):
-        prec = precision_at_k(predictions, actuals, i)
-        avg_prec.append(prec)
-    return np.mean(avg_prec)
-
-
-def ndcg_at_k(predictions, actuals, k):
-    """
-    Computes the NDCG at k
-    :param predictions: array, predicted values
-    :param actuals: array, actual values
-    :param k: int, value to compute the metric at
-    :returns NDCG: float, the score at k
-    """
-    N = min(len(actuals), k)
-    cum_gain = 0
-    ideal_gain = 0
-    topk = predictions[-N:]
-    hits = 0
-    # calculate the ideal gain at k
-    for i in range(0, N):
-        if topk[i] in actuals:
-            cum_gain += 1 / np.log2(i + 2)
-            hits = hits + 1
-
-    for i in range(0, hits):
-        ideal_gain += 1 / np.log2(i + 2)
-    if ideal_gain != 0:
-        ndcg = cum_gain / ideal_gain
-    else:
-        ndcg = 0
-    return ndcg
 
 
 def main():
@@ -263,11 +176,6 @@ def main():
             # additive gaussian noise or multiplicative mask-out/drop-out noise
             epoch_loss = 0.0
             users = shuffle(users)
-            precision = []
-            recall = []
-            mean_avg_prec = []
-            ndcg = []
-            eval_at = [5, 10]
 
             tf.logging.info("Training the model...")
             for user_id in users:
