@@ -1,14 +1,15 @@
 '''
-CDAE Implementation
+Denoising AutoEncoder Implementation that utilizes the attention mechanism
+to incorporate contextual information such as the group and venue
 '''
 """
 Example Usage:
 
 Run for 20 epochs, 100 hidden units and a 0.5 corruption ratio
-python cdae.py --epochs 20 --size 100 --corrupt 0.5
+python attention_auto_encoder.py --epochs 20 --size 100 --corrupt 0.5
 
 To turn off latent factors, eg for group latent factor
-python cdae.py --nogroup
+python attention_auto_encoder.py --nogroup
 """
 
 import argparse
@@ -16,9 +17,10 @@ import os
 
 from sklearn.utils import shuffle
 
-import aeer.dataset.event_dataset as ds
-import aeer.dataset.user_group_dataset as ug_dataset
-from aeer.model.utils import ACTIVATION_FN, set_logging_config
+from acda.common.metrics import precision_at_k, recall_at_k, map_at_k, ndcg_at_k
+from acda.common.utils import ACTIVATION_FN, set_logging_config
+import acda.dataset.event_dataset as ds
+import acda.dataset.user_group_dataset as ug_dataset
 import numpy as np
 import tensorflow as tf
 
@@ -46,9 +48,9 @@ parser.add_argument('--output_fn',
                     default='sigmoid', type=str, choices=activation_fn_names)
 
 
-class CDAEAutoEncoder(object):
+class AttentionAutoEncoder(object):
 
-    def __init__(self, n_inputs, n_hidden, n_outputs, n_users,
+    def __init__(self, n_inputs, n_hidden, n_outputs, n_groups, n_venues,
                  hidden_activation='relu', output_activation='sigmoid',
                  learning_rate=0.001):
         """
@@ -56,12 +58,14 @@ class CDAEAutoEncoder(object):
         :param n_inputs: int, Number of input features (number of events)
         :param n_hidden: int, Number of hidden units
         :param n_outputs: int, Number of output features (number of events)
-        :param n_users: int, Number of users or None to disable
+        :param n_groups: int, Number of groups or None to disable
+        :param n_venues: int, Number of venues or None to disable
         :param learning_rate: float, Step size
         """
 
         self.x = tf.placeholder(tf.float32, shape=[None, n_inputs])
-        self.user_id = tf.placeholder(tf.int32, shape=[None])
+        self.group_id = tf.placeholder(tf.int32, shape=[None])
+        self.venue_id = tf.placeholder(tf.int32, shape=[None])
 
         # We need to gather the indices from the matrix where our outputs are
         self.gather_indices = tf.placeholder(tf.int32, shape=[None, 2])
@@ -69,118 +73,69 @@ class CDAEAutoEncoder(object):
         self.y = tf.placeholder(tf.float32, shape=[None])
         self.dropout = tf.placeholder_with_default(1.0, shape=(), name='Dropout')
 
-        reg_constant = 0.01
         # Weights
-        W = tf.get_variable('W', shape=[n_inputs, n_hidden], regularizer=tf.contrib.layers.l2_regularizer(scale=reg_constant))
+        W = tf.get_variable('W', shape=[n_inputs, n_hidden])
         b = tf.get_variable('Bias', shape=[n_hidden])
 
         # Uniform Initialization U(-eps, eps)
         eps = 0.01
 
         preactivation = tf.nn.xw_plus_b(self.x, W, b)
-
         hidden = ACTIVATION_FN[hidden_activation](preactivation)
         hidden = tf.nn.dropout(hidden, self.dropout)
-        attention = hidden
-        
-        # Create and lookup each bias
-        user_bias = tf.get_variable('UserBias', shape=[n_users, n_hidden],
-                                     initializer=tf.random_uniform_initializer(-eps, eps))
-        self.user_factor = tf.nn.embedding_lookup(user_bias, self.user_id,
-                                                   name='UserLookup')
-        u_attn_weight = tf.get_variable('U_AttentionWLogits',
-                                                  shape=[n_hidden, 1], regularizer=tf.contrib.layers.l2_regularizer(scale=reg_constant))
 
-        # Weighted sum of user factors
-        user_weighted = tf.reduce_sum(u_attn_weight * self.user_factor,
-                                  axis=0)
-        attention += tf.squeeze(user_weighted)
-        
+        attention = hidden
+        # setup attention mechanism
+        # Add venue latent factor
+        if n_venues is not None:
+            # Create and lookup each bias
+            venue_bias = tf.get_variable('VenueBias', shape=[n_venues, n_hidden],
+                                         initializer=tf.random_uniform_initializer(-eps, eps))
+            self.venue_factor = tf.nn.embedding_lookup(venue_bias, self.venue_id,
+                                                       name='VenueLookup')
+            v_attn_weight = tf.get_variable('V_AttentionWLogits',
+                                                      shape=[n_hidden, 1])
+            v_attention = tf.matmul(self.venue_factor, v_attn_weight)
+
+            # Weighted sum of venue factors
+            venue_weighted = tf.reduce_sum(v_attention * self.venue_factor,
+                                      axis=0)
+            # Sum all venue factors, then make it a vector so it will broadcast
+            # and add it to all instances
+            attention += tf.squeeze(venue_weighted)
+
+        # Add group latent factor
+        if n_groups is not None:
+            group_bias = tf.get_variable('GroupBias', shape=[n_groups, n_hidden],
+                                         initializer=tf.random_uniform_initializer(-eps, eps))
+            self.group_factor = tf.nn.embedding_lookup(group_bias, self.group_id,
+                                                       name='GroupLookup')
+            g_attn_weight = tf.get_variable('AttentionWLogits',
+                                                      shape=[n_hidden, 1])
+            g_attention = tf.matmul(self.group_factor, g_attn_weight)
+
+            # Weighted sum of group factors
+            group_weighted = tf.reduce_sum(g_attention * self.group_factor,
+                                      axis=0)
+            # Add to
+            attention += tf.squeeze(group_weighted)
+
+        attn_output = tf.nn.softmax(tf.nn.tanh(attention))
+
         # create the output layer
-        W2 = tf.get_variable('W2', shape=[n_hidden, n_outputs], regularizer=tf.contrib.layers.l2_regularizer(scale=reg_constant))
+        W2 = tf.get_variable('W2', shape=[n_hidden, n_outputs])
         b2 = tf.get_variable('Bias2', shape=[n_outputs])
-        preactivation_output = tf.nn.xw_plus_b(tf.multiply(attention, hidden), W2, b2)
+        preactivation_output = tf.nn.xw_plus_b(tf.multiply(attn_output, hidden), W2, b2)
+        
         self.outputs = ACTIVATION_FN[output_activation](preactivation_output)
 
         self.targets = tf.gather_nd(self.outputs, self.gather_indices)
         self.actuals = tf.placeholder(tf.int64, shape=[None])
 
-        # square loss
         self.loss = tf.losses.mean_squared_error(self.targets, self.y)
         optimizer = tf.train.AdamOptimizer(learning_rate)
         # Train Model
         self.train = optimizer.minimize(self.loss)
-
-
-def precision_at_k(predictions, actuals, k):
-    """
-    Computes the precision at k
-    :param predictions: array, predicted values
-    :param actuals: array, actual values
-    :param k: int, value to compute the metric at
-    :returns precision: float, the precision score at k
-    """
-    N = len(actuals)
-    hits = len(set(predictions[-k:]).intersection(set(actuals)))
-    precision = hits / min(N, k)
-    return precision
-
-
-def recall_at_k(predictions, actuals, k):
-    """
-    Computes the recall at k
-    :param predictions: array, predicted values
-    :param actuals: array, actual values
-    :param k: int, value to compute the metric at
-    :returns recall: float, the recall score at k
-    """
-    N = len(actuals)
-    hits = len(set(predictions[-k:]).intersection(set(actuals)))
-    recall = hits / N
-    return recall
-
-
-def map_at_k(predictions, actuals, k):
-    """
-    Computes the MAP at k
-    :param predictions: array, predicted values
-    :param actuals: array, actual values
-    :param k: int, value to compute the metric at
-    :returns MAP: float, the score at k
-    """
-    avg_prec = []
-    for i in range(1, k + 1):
-        prec = precision_at_k(predictions, actuals, i)
-        avg_prec.append(prec)
-    return np.mean(avg_prec)
-
-
-def ndcg_at_k(predictions, actuals, k):
-    """
-    Computes the NDCG at k
-    :param predictions: array, predicted values
-    :param actuals: array, actual values
-    :param k: int, value to compute the metric at
-    :returns NDCG: float, the score at k
-    """
-    N = min(len(actuals), k)
-    cum_gain = 0
-    ideal_gain = 0
-    topk = predictions[-N:]
-    hits = 0
-    # calculate the ideal gain at k
-    for i in range(0, N):
-        if topk[i] in actuals:
-            cum_gain += 1 / np.log2(i + 2)
-            hits = hits + 1
-
-    for i in range(0, hits):
-        ideal_gain += 1 / np.log2(i + 2)
-    if ideal_gain != 0:
-        ndcg = cum_gain / ideal_gain
-    else:
-        ndcg = 0
-    return ndcg
 
 
 def main():
@@ -193,10 +148,20 @@ def main():
     users = event_data.get_train_users()
 
     n_inputs = event_data.n_events
-    n_users = event_data.n_users
+    n_groups = event_data.n_groups
     n_outputs = event_data.n_events
+    n_venues = event_data.n_venues
 
-    model = CDAEAutoEncoder(n_inputs, n_hidden, n_outputs, n_users,
+    # We set to None to turn off the group/venue latent factors
+    if FLAGS.nogroup:
+        print("Disabling Group Latent Factor")
+        n_groups = None
+
+    if FLAGS.novenue:
+        print("Disabling Venue Latent Factor")
+        n_venues = None
+
+    model = AttentionAutoEncoder(n_inputs, n_hidden, n_outputs, n_groups, n_venues,
                                     FLAGS.hidden_fn, FLAGS.output_fn,
                                     learning_rate=0.001)
     tf_config = tf.ConfigProto(
@@ -211,18 +176,14 @@ def main():
             # additive gaussian noise or multiplicative mask-out/drop-out noise
             epoch_loss = 0.0
             users = shuffle(users)
-            precision = []
-            recall = []
-            mean_avg_prec = []
-            ndcg = []
-            eval_at = [5, 10]
 
             tf.logging.info("Training the model...")
             for user_id in users:
                 x, y, item = event_data.get_user_train_events(
                                                     user_id, NEG_COUNT, CORRUPT_RATIO)
                 train_event_index = event_data.get_user_train_event_index(user_id)
-                user_index = event_data.get_user_index(user_id)
+                group_ids = event_data.get_user_train_groups(user_id)
+                venue_ids = event_data.get_user_train_venues(user_id)
 
                 # We only compute loss on events we used as inputs
                 # Each row is to index the first dimension
@@ -232,20 +193,20 @@ def main():
                 batch_loss, _ = sess.run([model.loss, model.train], {
                     model.x: x.toarray().astype(np.float32),
                     model.gather_indices: gather_indices,
-                    model.user_id: user_index,
+                    model.group_id: group_ids,
+                    model.venue_id: venue_ids,
                     model.y: y,
                     model.dropout: 0.8
                 })
-               
                 epoch_loss += batch_loss
-               
+                
             tf.logging.info("Epoch: {:>16}       Loss: {:>10,.6f}".format("%s/%s" % (epoch, n_epochs),
                                                                 epoch_loss))
             tf.logging.info("")
             if prev_epoch_loss != 0 and abs(epoch_loss - prev_epoch_loss) < 1:
                 tf.logging.info("Decaying learning rate...")
                 model.decay_learning_rate(sess, 0.5)
-
+        
         # evaluate the model on the cv set
         cv_users = event_data.get_cv_users()
         precision = []
@@ -264,11 +225,13 @@ def main():
                 test_event_index = event_data.get_user_cv_event_index(user_id)
 
                 x, _, _ = event_data.get_user_train_events(user_id, 0, 0)
-                user_index = event_data.get_user_index(user_id)
+                group_ids = event_data.get_user_train_groups(user_id)
+                venue_ids = event_data.get_user_train_venues(user_id)
                 # Compute score
                 score = sess.run(model.outputs, {
                     model.x: x.toarray().astype(np.float32),
-                    model.user_id: user_index,
+                    model.group_id: group_ids,
+                    model.venue_id: venue_ids,
                     model.dropout: 1.0
                 })[0]  # We only do one sample at a time, take 0 index
 
@@ -328,11 +291,13 @@ def main():
                 test_event_index = event_data.get_user_test_event_index(user_id)
 
                 x, _, _ = event_data.get_user_train_events(user_id, 0, 0)
-                user_index = event_data.get_user_index(user_id)
+                group_ids = event_data.get_user_train_groups(user_id)
+                venue_ids = event_data.get_user_train_venues(user_id)
                 # Compute score
                 score = sess.run(model.outputs, {
                     model.x: x.toarray().astype(np.float32),
-                    model.user_id: user_index,
+                    model.group_id: group_ids,
+                    model.venue_id: venue_ids,
                     model.dropout: 1.0
                 })[0]  # We only do one sample at a time, take 0 index
 
