@@ -18,7 +18,7 @@ import os
 from sklearn.utils import shuffle
 
 import acda.dataset.movie_dataset as ds
-from aeer.model.utils import ACTIVATION_FN, set_logging_config
+from acda.common.utils import ACTIVATION_FN, set_logging_config
 import numpy as np
 import tensorflow as tf
 
