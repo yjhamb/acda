@@ -7,7 +7,7 @@ ACDA is a generic model that may be used for both rating prediction and top-N re
 The neural network architecture is provided below. There is one hidden layer and the context is applied to the hidden representation via the attention mechanism.
 The model is flexible enough to accommodate any number of contextual parameters; however, only two contextual parameters are depicted in the diagram for reference.
 
-![ACDA Architecture](./acda-model.pdf) 
+![ACDA Architecture](./acda-model.png) 
 
 # Datasets
 The model is evaluated against two datasets for the event recommendation 
