@@ -10,7 +10,7 @@ from scipy import sparse
 from scipy.stats import bernoulli
 from sklearn.preprocessing import MultiLabelBinarizer, LabelEncoder
 
-RATINGS_CONTEXT_FILE = "../../../dataset/movielens/rating_context.csv"
+RATINGS_CONTEXT_FILE = "../dataset/movielens/rating_context.csv"
 
 class MovieRatingsData(object):
 

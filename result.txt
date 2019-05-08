@@ -1,6 +1,9 @@
-2017-10-26 11:36:23.237275: W tensorflow/core/platform/cpu_feature_guard.cc:45] The TensorFlow library wasn't compiled to use SSE4.2 instructions, but these are available on your machine and could speed up CPU computations.
-2017-10-26 11:36:23.237321: W tensorflow/core/platform/cpu_feature_guard.cc:45] The TensorFlow library wasn't compiled to use AVX instructions, but these are available on your machine and could speed up CPU computations.
-2017-10-26 11:36:23.237328: W tensorflow/core/platform/cpu_feature_guard.cc:45] The TensorFlow library wasn't compiled to use AVX2 instructions, but these are available on your machine and could speed up CPU computations.
-2017-10-26 11:36:23.237332: W tensorflow/core/platform/cpu_feature_guard.cc:45] The TensorFlow library wasn't compiled to use FMA instructions, but these are available on your machine and could speed up CPU computations.
-Epoch 0/1          Loss: 967.695427
-Precision: 0.067220
+Total RSVPs: 22915
+Train RSVPs: 13749
+CV RSVPs: 4583
+Test RSVPs: 4583
+Total Users: 8118
+Total Events: 9133
+Total Groups: 592
+Total Venues: 1062
+Disabling Venue Latent Factor

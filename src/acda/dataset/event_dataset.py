@@ -9,12 +9,12 @@ import sklearn.model_selection as ms
 from scipy import sparse
 from scipy.stats import bernoulli
 from sklearn.preprocessing import MultiLabelBinarizer, LabelEncoder
-import acda.dataset.user_group_dataset as ug_dataset
+import dataset.user_group_dataset as ug_dataset
 
-rsvp_ny_file = "../../../dataset/meetup/rsvp_ny.csv"
-rsvp_sfo_file = "../../../dataset/meetup/rsvp_sfo.csv"
-rsvp_dc_file = "../../../dataset/meetup/rsvp_dc.csv"
-rsvp_chicago_file = "../../../dataset/meetup/rsvp_chicago.csv"
+rsvp_ny_file = "../dataset/meetup/rsvp_ny.csv"
+rsvp_sfo_file = "../dataset/meetup/rsvp_sfo.csv"
+rsvp_dc_file = "../dataset/meetup/rsvp_dc.csv"
+rsvp_chicago_file = "../dataset/meetup/rsvp_chicago.csv"
 
 
 class EventData(object):
